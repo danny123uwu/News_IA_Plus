@@ -1,0 +1,21 @@
+{
+  "name": "portal-ianews",
+  "version": "0.1.0",
+  "description": "Portal IA News - noticias con agente IA (microservicios + OAuth/JWT)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "auth": "node services/auth/index.js",
+    "feeds": "node services/feeds/index.js",
+    "agente": "node services/agent/index.js",
+    "web": "node web/index.js"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "rss-parser": "^3.13.0"
+  }
+}

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal IA News</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="vistaLogin" class="auth-box">
+    <h1>📰 Portal <span class="acento">IA</span> News</h1>
+    <p class="sub">Tu portal de noticias con inteligencia artificial</p>
+    <div class="tabs-login">
+      <button id="tabLogin" class="active">Entrar</button>
+      <button id="tabRegister">Crear cuenta</button>
+    </div>
+    <form id="formAuth">
+      <input type="text" id="nombre" placeholder="Tu nombre" class="oculto" />
+      <input type="email" id="email" placeholder="Correo" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <button type="submit" id="btnAuth">Entrar</button>
+    </form>
+    <p id="authError" class="error"></p>
+  </div>
+
+  <!-- APP -->
+  <div id="vistaApp" class="oculto">
+    <header class="topbar">
+      <div class="logo">📰 Portal <span class="acento">IA</span> News</div>
+      <div class="buscador">
+        <input type="text" id="buscar" placeholder="Buscar noticias..." />
+      </div>
+      <div class="usuario">
+        <button id="motorTop" class="chip-motor" title="Motor de IA activo — clic para configurar">⚙️ …</button>
+        <img id="fotoTop" class="avatar" src="" alt="" onerror="this.style.display='none'" />
+        <span id="nombreTop"></span>
+        <button id="btnSalir" class="btn-icono" title="Salir">⏻</button>
+      </div>
+    </header>
+
+    <!-- Burbujas de portales (estilo Instagram) -->
+    <div class="burbujas" id="burbujas"></div>
+
+    <nav class="nav">
+      <button class="tab active" data-vista="feed">✨ Para Ti</button>
+      <button class="tab" data-vista="fuentes">📡 Mis fuentes</button>
+      <button class="tab" data-vista="archivados">📁 Archivados</button>
+      <button class="tab" data-vista="perfil">👤 Mi perfil</button>
+      <button class="tab" data-vista="panel">📊 Panel</button>
+      <button class="tab" data-vista="ia">⚙️ IA</button>
+    </nav>
+
+    <main>
+      <!-- FEED -->
+      <section id="v-feed" class="vista">
+        <div class="barra-feed">
+          <button id="btnDigest" class="btn-destacado">☀️ Digest de hoy</button>
+          <select id="filtroHoras">
+            <option value="24">Últimas 24 horas</option>
+            <option value="72">Últimos 3 días</option>
+            <option value="168" selected>Última semana</option>
+            <option value="720">Último mes</option>
+          </select>
+          <button id="btnRefrescar" class="btn-secundario">🔄 Actualizar</button>
+        </div>
+        <div id="feedInfo" class="feed-info"></div>
+        <div id="cajaDigest" class="digest oculto"></div>
+        <div id="feedLista" class="lista-cards"><p class="vacio">Cargando noticias…</p></div>
+      </section>
+
+      <!-- FUENTES -->
+      <section id="v-fuentes" class="vista oculto">
+        <div class="card-form">
+          <h3>Agregar portal</h3>
+          <div class="fila">
+            <input type="text" id="fuenteNombre" placeholder="Nombre (ej: Hacker News)" />
+            <input type="url" id="fuenteUrl" placeholder="https://.../rss" />
+            <button id="btnAgregarFuente">Agregar</button>
+          </div>
+          <p id="fuenteMsg" class="msg"></p>
+          <div class="presets">
+            <span>Rápidos:</span>
+            <button class="preset" data-n="The Verge" data-u="https://www.theverge.com/rss/index.xml">+ The Verge</button>
+            <button class="preset" data-n="Ars Technica" data-u="https://feeds.arstechnica.com/arstechnica/index">+ Ars Technica</button>
+            <button class="preset" data-n="PC Gamer" data-u="https://www.pcgamer.com/rss/">+ PC Gamer</button>
+            <button class="preset" data-n="IGN" data-u="https://feeds.feedburner.com/ign/games-all">+ IGN</button>
+          </div>
+        </div>
+        <div id="fuentesLista" class="lista-fuentes"></div>
+      </section>
+
+      <!-- ARCHIVADOS -->
+      <section id="v-archivados" class="vista oculto">
+        <h3>📄 Noticias archivadas</h3>
+        <div id="archivadosLista" class="lista-cards"></div>
+        <h3>✂️ Mis recortes</h3>
+        <div id="recortesLista" class="lista-cards"></div>
+      </section>
+
+      <!-- PERFIL -->
+      <section id="v-perfil" class="vista oculto">
+        <div class="card-form">
+          <h3>Mi perfil</h3>
+          <div class="perfil-fila">
+            <img id="fotoPerfil" class="avatar-grande" src="" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22><rect width=%2290%22 height=%2290%22 fill=%22%23333%22/><text x=%2245%22 y=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>👤</text></svg>'" />
+            <div>
+              <input type="text" id="perfilNombre" placeholder="Tu nombre" />
+              <input type="file" id="perfilFoto" accept="image/*" />
+              <button id="btnGuardarPerfil">Guardar perfil</button>
+            </div>
+          </div>
+        </div>
+        <div class="card-form">
+          <h3>Mis intereses (temas de mi feed)</h3>
+          <p class="msg">Estos temas <b>ordenan</b> tu feed: lo que elijas aparece primero. No lo vacían.</p>
+          <div id="interesesCaja" class="chips-seleccion"></div>
+          <p class="msg" id="interesesMsg"></p>
+        </div>
+      </section>
+
+      <!-- PANEL -->
+      <section id="v-panel" class="vista oculto">
+        <div id="statsCaja" class="stats"></div>
+        <div class="card-form">
+          <h3>Leídos por portal</h3>
+          <div id="barrasFuente" class="barras"></div>
+        </div>
+        <div class="card-form">
+          <h3>Temas más frecuentes</h3>
+          <div id="barrasEtiqueta" class="barras"></div>
+        </div>
+      </section>
+      <!-- IA -->
+      <section id="v-ia" class="vista oculto">
+        <div class="card-form">
+          <h3>⚙️ Motor de inteligencia artificial</h3>
+          <p class="msg" id="iaEstado">Cargando…</p>
+          <div class="ia-motor">
+            <label class="ia-op">
+              <input type="radio" name="motorIA" value="local" />
+              <span><b>🖥️ Modelo local (Ollama)</b><br /><small>Gratis y privado. Corre en tu PC.</small></span>
+            </label>
+            <label class="ia-op">
+              <input type="radio" name="motorIA" value="api" />
+              <span><b>☁️ API externa</b><br /><small>Cualquier proveedor compatible con OpenAI (Gemini, Groq, OpenRouter…).</small></span>
+            </label>
+          </div>
+
+          <div id="iaApiCaja" class="oculto">
+            <div class="fila">
+              <select id="iaProveedor" title="Proveedor"></select>
+              <input type="text" id="iaModelo" placeholder="modelo (ej: gemini-2.0-flash)" />
+            </div>
+            <input type="text" id="iaBaseUrl" placeholder="URL base de la API" />
+            <input type="password" id="iaKey" placeholder="API key" autocomplete="off" />
+            <div class="fila">
+              <button id="btnProbarApi" class="btn-secundario" type="button">🧪 Probar API</button>
+            </div>
+            <p class="msg" id="iaApiMsg"></p>
+          </div>
+        </div>
+
+        <div class="card-form">
+          <h3>Modelos por tarea</h3>
+          <p class="msg">Cada tarea usa <b>un solo</b> modelo (uno a la vez, sin sobrecargar la PC). Con <b>⭐</b> está lo recomendado para tu equipo.</p>
+          <div class="ia-tarea">
+            <label for="iaClasificar">🏷️ Clasificar etiquetas <small>— rápido, corre en lote al importar</small></label>
+            <select id="iaClasificar"></select>
+          </div>
+          <div class="ia-tarea">
+            <label for="iaResumir">📝 Resumir, Preguntar y Digest <small>— calidad de texto</small></label>
+            <select id="iaResumir"></select>
+          </div>
+          <p class="msg" id="iaModelosMsg"></p>
+        </div>
+
+        <div class="card-form">
+          <h3>🌐 Traducción al español</h3>
+          <label class="ia-radio"><input type="radio" name="tradMotor" value="google" /> Google Translate <small>(gratis, sin key, 0.16 s)</small></label>
+          <label class="ia-radio"><input type="radio" name="tradMotor" value="motor" /> Usar el motor elegido arriba</label>
+          <p class="msg" id="iaTradMsg"></p>
+        </div>
+
+        <div class="fila">
+          <button id="btnGuardarIA">💾 Guardar configuración</button>
+          <button id="btnProbarIA" class="btn-secundario">🧪 Probar resumen</button>
+        </div>
+        <p class="msg" id="iaMsg"></p>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL artículo -->
+  <div id="modal" class="modal oculto">
+    <div class="modal-caja">
+      <button class="modal-cerrar" id="modalCerrar">✖</button>
+      <div id="modalCuerpo"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast oculto"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

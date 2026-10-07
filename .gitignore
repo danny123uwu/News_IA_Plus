@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+
+# Datos sensibles: bases de datos, llaves API, uploads
+data/
+
+# Entorno virtual de Python
+new/
+
+# Archivos del sistema
+.directory
+.DS_Store
+*.log
+
+# Variables de entorno
+.env
+.env.*
