@@ -2,7 +2,7 @@
 
 Portal de noticias con agente de inteligencia artificial — **3 microservicios + JWT + IA local o API externa**.
 
-> **Estado: 4 oct 2026** — alfa usable. Lo que falta está listado abajo en [Pendiente](#pendiente-falta).
+> **Estado: 7 oct 2026** — alfa usable. Lo que falta está listado abajo en [Pendiente](#pendiente-falta).
 
 ## Requisitos
 - Node.js 22+ (usa `node:sqlite` incluido, sin instalar nada más)
@@ -11,12 +11,30 @@ Portal de noticias con agente de inteligencia artificial — **3 microservicios 
 ## Cómo correrlo
 
 ```bash
-cd portal-ianews
+git clone https://github.com/danny123uwu/News_IA_Plus.git
+cd News_IA_Plus
 npm install
 npm start
 ```
 
 Abrir **http://localhost:8090**
+
+En la primera ejecución se crea solo la carpeta `data/` con las bases de datos — no hace falta configurar nada.
+
+## Estructura
+
+```
+portal-ianews/
+├── start.js            # arranca los 4 servicios con un solo comando
+├── services/
+│   ├── auth/           # registro, login, JWT, perfil (puerto 3001)
+│   ├── feeds/          # fuentes RSS, artículos, feed (puerto 3002)
+│   └── agent/          # agente IA (puerto 3003)
+├── web/                # frontend (puerto 8090)
+└── data/               # bases de datos y llaves de IA (NO se sube a git)
+```
+
+> ⚠️ **Seguridad**: `data/` está en `.gitignore` porque contiene las bases de datos y las llaves API de cada usuario. Nunca lo suban a GitHub.
 
 ## Arquitectura
 
