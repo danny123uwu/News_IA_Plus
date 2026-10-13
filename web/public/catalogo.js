@@ -1,0 +1,187 @@
+// Catálogo de portales tech — clic en "+" para agregar directo a tus fuentes
+window.CATALOGO = [
+{ cat: 'Tecnología general', items: [
+  { n: 'The Verge', u: 'https://www.theverge.com/rss/index.xml' },
+  { n: 'TechCrunch', u: 'https://techcrunch.com/feed/' },
+  { n: 'Ars Technica', u: 'https://feeds.arstechnica.com/arstechnica/index' },
+  { n: 'Wired', u: 'https://www.wired.com/feed/rss' },
+  { n: 'Engadget', u: 'https://www.engadget.com/rss.xml' },
+  { n: 'TechRadar', u: 'https://www.techradar.com/rss' },
+  { n: 'ZDNet', u: 'https://www.zdnet.com/news/rss.xml' },
+  { n: 'CNET', u: 'https://www.cnet.com/rss/news/' },
+  { n: 'Gizmodo', u: 'https://gizmodo.com/rss' },
+  { n: 'Mashable', u: 'https://mashable.com/feeds/rss/all' }
+]},
+{ cat: 'Agregadores y dashboards', items: [
+  { n: 'Hacker News', u: 'https://hnrss.org/frontpage' },
+  { n: 'Techmeme', u: 'https://www.techmeme.com/feed.xml?noui&fallback=main' },
+  { n: 'Slashdot', u: 'https://rss.slashdot.org/Slashdot/slashdotMain' },
+  { n: 'Lobsters', u: 'https://lobste.rs/rss' },
+  { n: 'Reddit r/technology', u: 'https://www.reddit.com/r/technology/.rss' },
+  { n: 'Product Hunt', u: 'https://www.producthunt.com/feed' },
+  { n: 'Feedly (blog)', u: 'https://blog.feedly.com/feed/' },
+  { n: 'Inoreader (blog)', u: 'https://www.inoreader.com/blog/rss/' }
+]},
+{ cat: 'Hacking y ciberseguridad', items: [
+  { n: 'The Hacker News', u: 'https://thehackernews.com/rss.xml' },
+  { n: 'BleepingComputer', u: 'https://www.bleepingcomputer.com/feed/' },
+  { n: 'Krebs on Security', u: 'https://krebsonsecurity.com/feed/' },
+  { n: 'Dark Reading', u: 'https://www.darkreading.com/rss.xml' },
+  { n: 'SecurityWeek', u: 'https://securityweek.com/feed' },
+  { n: 'Schneier on Security', u: 'https://www.schneier.com/feed/atom/' },
+  { n: 'The Record', u: 'https://therecord.media/feed' },
+  { n: 'CISA (KEV catalog)', u: 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json' },
+  { n: 'NVD (CVEs)', u: 'https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml' },
+  { n: 'Exploit-DB', u: 'https://www.exploit-db.com/rss.xml' },
+  { n: 'Hackaday', u: 'https://hackaday.com/feed/' },
+  { n: 'PortSwigger Research', u: 'https://portswigger.net/research/rss' }
+]},
+{ cat: 'Inteligencia artificial', items: [
+  { n: 'VentureBeat AI', u: 'https://venturebeat.com/category/ai/feed/' },
+  { n: 'MIT Technology Review', u: 'https://www.technologyreview.com/feed/' },
+  { n: 'The Rundown AI', u: 'https://therundown.ai/rss' },
+  { n: 'Hugging Face Blog', u: 'https://huggingface.co/blog/feed.xml' },
+  { n: 'OpenAI News', u: 'https://openai.com/news/rss.xml' },
+  { n: 'Anthropic News', u: 'https://www.anthropic.com/rss.xml' },
+  { n: 'Google AI Blog', u: 'https://blog.google/technology/ai/rss/' },
+  { n: 'arXiv cs.AI', u: 'http://export.arxiv.org/rss/cs.AI' }
+]},
+{ cat: 'Linux y servidores', items: [
+  { n: 'Phoronix', u: 'https://www.phoronix.com/rss.php' },
+  { n: 'OMG! Ubuntu', u: 'https://www.omgubuntu.co.uk/feed' },
+  { n: '9to5Linux', u: 'https://9to5linux.com/feed' },
+  { n: "It's FOSS", u: 'https://itsfoss.com/rss/' },
+  { n: 'LWN.net', u: 'https://lwn.net/headlines/rss' },
+  { n: 'Linux Today', u: 'https://www.linuxtoday.com/backend.rss' },
+  { n: 'Linuxiac', u: 'https://linuxiac.com/feed/' },
+  { n: 'DistroWatch', u: 'https://distrowatch.com/news/dw.xml' },
+  { n: 'Kernel.org (blog)', u: 'https://www.kernel.org/feeds/kdist.xml' },
+  { n: 'Linux Handbook', u: 'https://linuxhandbook.com/feed/' },
+  { n: 'Tecmint', u: 'https://www.tecmint.com/feed/' },
+  { n: 'Red Hat Blog', u: 'https://www.redhat.com/en/blog/feed' },
+  { n: 'Laboratorio Linux', u: 'https://laboratoriolinux.es/feed/' }
+]},
+{ cat: 'Tecnología general (español)', items: [
+  { n: 'Xataka', u: 'https://www.xataka.com/rss' },
+  { n: 'Genbeta', u: 'https://www.genbeta.com/rss' },
+  { n: 'Hipertextual', u: 'https://www.hipertextual.com/rss' },
+  { n: 'Computer Hoy', u: 'https://computerhoy.com/feed' },
+  { n: 'Muy Computer', u: 'https://muycomputer.com/feed' },
+  { n: 'Microsiervos', u: 'https://www.microsiervos.com/atom.xml' },
+  { n: 'WWWhatsnew', u: 'https://wwwhatsnew.com/feed/' },
+  { n: 'Gizmodo en Español', u: 'https://es.gizmodo.com/rss' },
+  { n: 'Digital Trends Español', u: 'https://es.digitaltrends.com/feed/' },
+  { n: 'FayerWayer', u: 'https://www.fayerwayer.com/feed/' },
+  { n: 'Xataka México', u: 'https://www.xataka.com.mx/rss' },
+  { n: 'Xataka Colombia', u: 'https://www.xataka.com.co/rss' },
+  { n: 'Infobae Tecno', u: 'https://www.infobae.com/tecno/feed/' },
+  { n: 'El País Tecnología', u: 'https://elpais.com/rss/tecnologia.xml' },
+  { n: 'BBC Mundo', u: 'https://feeds.bbci.co.uk/mundo/rss.xml' }
+]},
+{ cat: 'Móviles, redes y ecosistemas', items: [
+  { n: 'Xataka Android', u: 'https://www.xatakandroid.com/rss' },
+  { n: 'Applesfera', u: 'https://www.applesfera.com/rss' },
+  { n: 'Andro4all', u: 'https://www.andro4all.com/feed' },
+  { n: 'ADSLZone', u: 'https://www.adslzone.net/feed' },
+  { n: 'RedesZone', u: 'https://www.redeszone.net/feed' }
+]},
+{ cat: 'Seguridad y hacking (español)', items: [
+  { n: 'WeLiveSecurity (ESET)', u: 'https://www.welivesecurity.com/es/feed/' },
+  { n: 'INCIBE', u: 'https://www.incibe.es/noticias/feed' },
+  { n: 'Una al día (Hispasec)', u: 'https://unaaldia.hispasec.com/feed' },
+  { n: 'MuySeguridad', u: 'https://www.muyseguridad.com/feed' },
+  { n: 'Segu-Info', u: 'https://blog.segu-info.com.ar/feeds/posts/default?alt=rss' },
+  { n: 'Un informático en el lado del mal', u: 'https://www.elladodelmal.com/feed' },
+  { n: 'Flu Project', u: 'https://flu-project.com/feed' },
+  { n: 'Security Art Work', u: 'https://www.securityartwork.es/feed/' },
+  { n: 'Kaspersky Blog Latam', u: 'https://latam.kaspersky.com/blog/feed' },
+  { n: 'CCN-CERT', u: 'https://www.ccn-cert.cni.es/rss' }
+]},
+{ cat: 'Linux (español)', items: [
+  { n: 'MuyLinux', u: 'https://www.muylinux.com/feed' },
+  { n: 'Linuxadictos', u: 'https://www.linuxadictos.com/feed' },
+  { n: 'Ubunlog', u: 'https://www.ubunlog.com/feed' },
+  { n: 'DesdeLinux', u: 'https://blog.desdelinux.net/feed/' }
+]},
+{ cat: 'Hardware, PC gamer y videojuegos', items: [
+  { n: 'HardZone', u: 'https://hardzone.es/feed/' },
+  { n: 'Geeknetic', u: 'https://www.geeknetic.es/feed' },
+  { n: 'El Chapuzas Informático', u: 'https://www.elchapuzasinformatico.com/feed' },
+  { n: 'Profesional Review', u: 'https://www.profesionalreview.com/feed/' },
+  { n: 'Vandal', u: 'https://vandal.elespanol.com/rss' },
+  { n: '3DJuegos', u: 'https://www.3djuegos.com/rss' },
+  { n: 'VidaExtra', u: 'https://www.vidaextra.com/rss' },
+  { n: 'Hobby Consolas', u: 'https://www.hobbyconsolas.com/rss' },
+  { n: 'Atomix', u: 'https://atomix.vg/feed' },
+  { n: 'PC Gamer', u: 'https://www.pcgamer.com/rss/' },
+  { n: 'IGN', u: 'https://feeds.feedburner.com/ign/games-all' }
+]},
+{ cat: 'Desarrollo de software y web', items: [
+  { n: 'Genbeta Dev', u: 'https://www.genbeta.com/desarrollo/feed' },
+  { n: 'Platzi Blog', u: 'https://platzi.com/blog/feed/' },
+  { n: 'freeCodeCamp (español)', u: 'https://www.freecodecamp.org/espanol/news/rss.xml' },
+  { n: 'MDN Web Docs (español)', u: 'https://developer.mozilla.org/es/docs/Web/rss.xml' },
+  { n: 'DesarrolloWeb', u: 'https://www.desarrolloweb.com/rss' },
+  { n: 'Adictos al Trabajo', u: 'https://www.adictosaltrabajo.com/feed' },
+  { n: 'Código Facilito', u: 'https://codigofacilito.com/blog/rss' }
+]},
+{ cat: 'IA a fondo', items: [
+  { n: 'Import AI', u: 'https://importai.substack.com/feed' },
+  { n: 'The Batch (DeepLearning.AI)', u: 'https://www.deeplearning.ai/the-batch/feed/' },
+  { n: 'Ahead of AI', u: 'https://magazine.sebastianraschka.com/feed' },
+  { n: 'Latent Space', u: 'https://www.latent.space/feed' },
+  { n: "Simon Willison's Weblog", u: 'https://simonwillison.net/atom/everything/' },
+  { n: 'Google DeepMind Blog', u: 'https://deepmind.google/blog/rss.xml' },
+  { n: 'Meta AI Blog', u: 'https://ai.meta.com/blog/rss/' },
+  { n: 'NVIDIA Blog', u: 'https://blogs.nvidia.com/feed/' },
+  { n: 'Hugging Face Papers', u: 'https://huggingface.co/papers/rss' },
+  { n: 'Reddit r/LocalLLaMA', u: 'https://www.reddit.com/r/LocalLLaMA/.rss' },
+  { n: 'Ollama Blog', u: 'https://ollama.com/blog/feed.xml' },
+  { n: 'AI News', u: 'https://artificialintelligence-news.com/feed/' }
+]},
+{ cat: 'Windows y macOS', items: [
+  { n: 'Windows Central', u: 'https://www.windowscentral.com/feed' },
+  { n: 'Neowin', u: 'https://www.neowin.net/rss/' },
+  { n: 'Windows Latest', u: 'https://www.windowslatest.com/feed/' },
+  { n: 'Thurrott', u: 'https://www.thurrott.com/feed' },
+  { n: 'Windows Blog (oficial)', u: 'https://blogs.windows.com/windowsexperience/feed/' },
+  { n: '9to5Mac', u: 'https://9to5mac.com/feed/' },
+  { n: 'MacRumors', u: 'https://feeds.macrumors.com/MacRumors-All' },
+  { n: 'AppleInsider', u: 'https://appleinsider.com/rss' },
+  { n: 'SoftZone', u: 'https://www.softzone.es/feed' },
+  { n: 'Microsoft Tech Community', u: 'https://techcommunity.microsoft.com/gxcuf89792/rss/board?board.id=WindowsExperienceBlog' }
+]},
+{ cat: 'DevOps, Docker y cloud', items: [
+  { n: 'Docker Blog', u: 'https://www.docker.com/blog/feed/' },
+  { n: 'Kubernetes Blog', u: 'https://kubernetes.io/feed.xml' },
+  { n: 'The New Stack', u: 'https://thenewstack.io/feed/' },
+  { n: 'InfoQ', u: 'https://feed.infoq.com/' },
+  { n: 'Cloudflare Blog', u: 'https://blog.cloudflare.com/rss/' },
+  { n: 'AWS News Blog', u: 'https://aws.amazon.com/blogs/aws/feed/' },
+  { n: 'Google Cloud Blog', u: 'https://cloud.google.com/blog/rss' },
+  { n: 'Red Hat Developer', u: 'https://developers.redhat.com/blog/feed' },
+  { n: 'DigitalOcean Community', u: 'https://www.digitalocean.com/community/feed' },
+  { n: 'GitHub Blog', u: 'https://github.blog/feed/' },
+  { n: 'GitLab Blog', u: 'https://about.gitlab.com/atom.xml' },
+  { n: 'Netflix Tech Blog', u: 'https://netflixtechblog.com/feed' },
+  { n: 'Azure Blog', u: 'https://azure.microsoft.com/en-us/blog/feed/' }
+]},
+{ cat: 'Hardware y benchmarks (inglés)', items: [
+  { n: "Tom's Hardware", u: 'https://www.tomshardware.com/feeds/all' },
+  { n: 'TechPowerUp', u: 'https://www.techpowerup.com/rss/news/' },
+  { n: 'Gamers Nexus', u: 'https://www.gamersnexus.net/feed' },
+  { n: 'Notebookcheck', u: 'https://www.notebookcheck.net/News.152.1.xml' },
+  { n: 'VideoCardz', u: 'https://videocardz.com/feed' },
+  { n: 'Guru3D', u: 'https://www.guru3d.com/feed/' },
+  { n: 'Digital Foundry', u: 'https://www.eurogamer.net/digitalfoundry/feed' }
+]},
+{ cat: 'Comunidades y newsletters', items: [
+  { n: 'Stack Overflow Blog', u: 'https://stackoverflow.blog/feed/' },
+  { n: 'DEV Community', u: 'https://dev.to/feed' },
+  { n: 'TLDR Newsletter', u: 'https://tldr.tech/tech/rss' },
+  { n: 'Smashing Magazine', u: 'https://www.smashingmagazine.com/feed/' },
+  { n: 'CSS-Tricks', u: 'https://css-tricks.com/feed/' },
+  { n: 'Hashnode', u: 'https://hashnode.com/rss' },
+  { n: 'freeCodeCamp News', u: 'https://www.freecodecamp.org/news/rss.xml' }
+]}
+];

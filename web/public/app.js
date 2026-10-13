@@ -6,8 +6,14 @@ let token = localStorage.getItem('token') || '';
 let yo = null;
 let fuentes = [];
 let modoRegistro = false;
+let filtroFuente = null; // {id, nombre} — portada de una fuente
 
 const $ = (id) => document.getElementById(id);
+
+function tagsDe(a) {
+  if (Array.isArray(a.etiquetas)) return a.etiquetas;
+  try { return JSON.parse(a.etiquetas || '[]'); } catch { return []; }
+}
 
 function toast(msg) {
   const t = $('toast');
@@ -121,11 +127,20 @@ function pintarBurbujas() {
     div.className = 'burbuja' + (f.activo ? '' : ' pausada');
     div.title = f.nombre + ' — prioridad ' + f.prioridad + '/5';
     div.innerHTML = `<div class="anillo"><span>${esc((f.nombre || '?')[0].toUpperCase())}</span></div><small>${esc(f.nombre)}</small>`;
-    div.addEventListener('click', () => {
-      document.querySelector('[data-vista="fuentes"]').click();
-    });
+    div.addEventListener('click', () => abrirPortada(f));
     caja.appendChild(div);
   });
+}
+
+function abrirPortada(f) {
+  filtroFuente = { id: f.id, nombre: f.nombre };
+  document.querySelector('[data-vista="feed"]').click();
+  cargarFeed();
+}
+
+function cerrarPortada() {
+  filtroFuente = null;
+  cargarFeed();
 }
 
 // ---------- FUENTES ----------
@@ -135,7 +150,35 @@ async function cargarFuentes() {
     fuentes = d.fuentes;
     pintarBurbujas();
     pintarFuentes();
+    pintarPrioridades();
   } catch (err) { toast(err.message); }
+}
+
+function pintarPrioridades() {
+  const caja = $('prioridadesLista');
+  if (!caja) return;
+  if (!fuentes.length) { caja.innerHTML = '<p class="vacio">Agrega fuentes para priorizarlas aquí.</p>'; return; }
+  caja.innerHTML = '';
+  fuentes.forEach((f) => {
+    const fila = document.createElement('div');
+    fila.className = 'prio-fila';
+    fila.innerHTML = `
+      <span class="prio-nombre">${esc(f.nombre)}</span>
+      <input type="range" min="1" max="5" value="${f.prioridad}" />
+      <span class="prio-valor">${f.prioridad}/5</span>`;
+    const rango = fila.querySelector('input');
+    rango.addEventListener('input', () => { fila.querySelector('.prio-valor').textContent = rango.value + '/5'; });
+    rango.addEventListener('change', async () => {
+      try {
+        await api(FEEDS, '/feeds/' + f.id, { method: 'PUT', body: JSON.stringify({ prioridad: Number(rango.value) }) });
+        f.prioridad = Number(rango.value);
+        toast('Prioridad de ' + f.nombre + ': ' + rango.value + '/5');
+        pintarBurbujas();
+        cargarFeed();
+      } catch (e) { toast(e.message); }
+    });
+    caja.appendChild(fila);
+  });
 }
 
 function pintarFuentes() {
@@ -152,18 +195,8 @@ function pintarFuentes() {
         ${f.ultimo_error ? `<div class="error-fuente">${esc(f.ultimo_error)}</div>` : ''}
       </div>
       <span class="pill ${f.activo ? 'activo' : 'pausado'}">${f.activo ? 'Activo' : 'Pausado'}</span>
-      <label class="prio-txt">Prioridad</label>
-      <input type="range" min="1" max="5" value="${f.prioridad}" />
-      <span class="prio-txt">${f.prioridad}/5</span>
       <button class="btn-peq" data-act="toggle">${f.activo ? '⏸ Pausar' : '▶ Activar'}</button>
       <button class="btn-peq" data-act="del">🗑</button>`;
-    div.querySelector('input').addEventListener('change', async (e) => {
-      try {
-        await api(FEEDS, '/feeds/' + f.id, { method: 'PUT', body: JSON.stringify({ prioridad: Number(e.target.value) }) });
-        toast('Prioridad actualizada');
-        cargarFuentes();
-      } catch (err) { toast(err.message); }
-    });
     div.querySelector('[data-act="toggle"]').addEventListener('click', async () => {
       try {
         await api(FEEDS, '/feeds/' + f.id, { method: 'PUT', body: JSON.stringify({ activo: !f.activo }) });
@@ -183,14 +216,17 @@ function pintarFuentes() {
   });
 }
 
-async function agregarFuente(nombre, url) {
+async function agregarFuente(nombre, url, btn) {
   const msg = $('fuenteMsg');
+  const textoOriginal = btn ? btn.textContent : '';
   msg.className = 'msg';
   msg.textContent = 'Probando y agregando…';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Agregando…'; }
   try {
     const d = await api(FEEDS, '/feeds', { method: 'POST', body: JSON.stringify({ nombre, url }) });
     msg.className = 'msg ok';
     msg.textContent = '✓ "' + (d.titulo || nombre) + '" agregado';
+    if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('cat-ok'); btn.title = 'Agregado a tus fuentes'; }
     $('fuenteNombre').value = '';
     $('fuenteUrl').value = '';
     await cargarFuentes();
@@ -199,11 +235,65 @@ async function agregarFuente(nombre, url) {
     msg.className = 'msg';
     msg.style.color = '#f4212e';
     msg.textContent = err.message;
+    if (btn) {
+      btn.textContent = '❌ ' + err.message.slice(0, 42);
+      btn.title = err.message;
+      btn.classList.add('cat-err');
+      btn.disabled = false;
+      setTimeout(() => { btn.textContent = textoOriginal; btn.classList.remove('cat-err'); }, 5000);
+    }
   }
 }
 
-$('btnAgregarFuente').addEventListener('click', () => agregarFuente($('fuenteNombre').value, $('fuenteUrl').value));
-document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => agregarFuente(b.dataset.n, b.dataset.u)));
+$('btnAgregarFuente').addEventListener('click', () => agregarFuente($('fuenteNombre').value, $('fuenteUrl').value, $('btnAgregarFuente')));
+document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => agregarFuente(b.dataset.n, b.dataset.u, b)));
+
+// ---------- CATÁLOGO DE PORTALES ----------
+function pintarCatalogo() {
+  const caja = $('catalogoCaja');
+  if (!caja || !window.CATALOGO) return;
+  caja.innerHTML = '';
+  window.CATALOGO.forEach((grupo) => {
+    const det = document.createElement('details');
+    det.className = 'cat-detalle';
+    det.dataset.cat = grupo.cat.toLowerCase();
+    const suma = document.createElement('summary');
+    suma.innerHTML = `<span class="flecha">▸</span> ${esc(grupo.cat)} <small class="cat-cont">${grupo.items.length} portales</small>`;
+    det.appendChild(suma);
+    const lista = document.createElement('div');
+    lista.className = 'cat-items';
+    grupo.items.forEach((it) => {
+      const fila = document.createElement('div');
+      fila.className = 'cat-item';
+      fila.dataset.busca = (it.n + ' ' + it.u + ' ' + grupo.cat).toLowerCase();
+      fila.innerHTML = `
+        <span class="cat-nombre"><b>${esc(it.n)}</b><small>${esc(it.u.replace(/^https?:\/\//, '').split('/')[0])}</small></span>
+        <button class="btn-peq cat-add">+ Agregar</button>`;
+      fila.querySelector('.cat-add').addEventListener('click', () => agregarFuente(it.n, it.u, fila.querySelector('.cat-add')));
+      lista.appendChild(fila);
+    });
+    det.appendChild(lista);
+    det.addEventListener('toggle', () => suma.querySelector('.flecha').textContent = det.open ? '▾' : '▸');
+    caja.appendChild(det);
+  });
+}
+
+$('buscadorCatalogo').addEventListener('input', () => {
+  const q = $('buscadorCatalogo').value.trim().toLowerCase();
+  document.querySelectorAll('.cat-detalle').forEach((det) => {
+    let visibles = 0;
+    det.querySelectorAll('.cat-item').forEach((fila) => {
+      const ok = !q || fila.dataset.busca.includes(q);
+      fila.classList.toggle('oculto', !ok);
+      if (ok) visibles++;
+    });
+    det.classList.toggle('oculto', q && !visibles);
+    if (q && visibles) { det.open = true; det.querySelector('.flecha').textContent = '▾'; }
+    if (!q) { det.open = false; det.querySelector('.flecha').textContent = '▸'; }
+  });
+});
+
+pintarCatalogo();
 
 $('btnRefrescar').addEventListener('click', async () => {
   toast('Actualizando noticias…');
@@ -233,6 +323,28 @@ function pintarInfo(d) {
 async function cargarFeed() {
   const caja = $('feedLista');
   try {
+    if (filtroFuente) {
+      const d = await api(FEEDS, '/articles?fuente=' + encodeURIComponent(filtroFuente.id));
+      const arts = d.articulos || [];
+      const info = $('feedInfo');
+      info.innerHTML = '';
+      const aviso = document.createElement('div');
+      aviso.className = 'portada-aviso';
+      aviso.innerHTML = `<span>🗞 Portada de <b>${esc(filtroFuente.nombre)}</b> · ${arts.length} noticias</span>`;
+      const btnSalir = document.createElement('button');
+      btnSalir.id = 'btnCerrarPortada';
+      btnSalir.textContent = '✕ Ver todas las fuentes';
+      btnSalir.addEventListener('click', cerrarPortada);
+      aviso.appendChild(btnSalir);
+      info.appendChild(aviso);
+      if (!arts.length) {
+        caja.innerHTML = '<p class="vacio">Esta fuente no tiene noticias recientes. Pulsa 🔄 Actualizar.</p>';
+        return;
+      }
+      caja.innerHTML = '';
+      arts.forEach((a, i) => caja.appendChild(cardNoticia(a, i === 0)));
+      return;
+    }
     const intereses = (yo && yo.intereses ? yo.intereses : []).join(',');
     const horas = $('filtroHoras').value;
     const q = $('buscar').value.trim();
@@ -247,18 +359,22 @@ async function cargarFeed() {
   } catch (err) { caja.innerHTML = '<p class="vacio">' + esc(err.message) + '</p>'; }
 }
 
-function cardNoticia(a) {
+function cardNoticia(a, destacada) {
   const div = document.createElement('div');
-  div.className = 'card-noticia';
+  div.className = 'card-noticia' + (destacada ? ' destacada' : '');
+  div.dataset.id = a.id;
   const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '';
-  const tags = JSON.parse(a.etiquetas || '[]');
+  const tags = tagsDe(a);
   const titulo = a.titulo_es || a.titulo;
   const extracto = a.resumen_es || a.contenido;
   const traducido = a.titulo_es && a.titulo_es !== a.titulo;
   div.innerHTML = `
     ${a.imagen ? `<div class="media"><img src="${esc(a.imagen)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.style.display='none'">${a.video ? '<span class="play">▶ video</span>' : ''}</div>` : ''}
     <div class="cabecera">
-      <span class="pastilla ${a.prioridad >= 4 ? 'prio' : ''}">📡 ${esc(a.fuente)}</span>
+      <span class="pastilla ${a.prioridad >= 4 ? 'prio' : ''}">📡 ${esc(a.fuente)}
+        <button class="prio-btn" data-a="subir" title="Subir prioridad de ${esc(a.fuente)}">▲</button><button class="prio-btn" data-a="bajar" title="Bajar prioridad de ${esc(a.fuente)}">▼</button>
+        <span class="prio-num">${a.prioridad}/5</span>
+      </span>
       <span>🗓 ${fecha}</span>
       ${a.autor ? '<span>✍ ' + esc(a.autor) + '</span>' : ''}
       ${traducido ? '<span class="pastilla">🌐 ES</span>' : ''}
@@ -272,9 +388,15 @@ function cardNoticia(a) {
       <button data-a="fav" class="${a.favorito ? 'on' : ''}">${a.favorito ? '★ Guardado' : '☆ Favorito'}</button>
       <button data-a="archivar">📁 Archivar</button>
       <button data-a="saltar">✖ No me interesa</button>
-      <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver original ↗</a>
+      <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver fuente ↗</a>
     </div>`;
+  div.addEventListener('click', (e) => {
+    if (e.target.closest('button, a')) return;
+    abrirArticulo(a);
+  });
   div.querySelector('[data-a="abrir"]').addEventListener('click', () => abrirArticulo(a));
+  div.querySelector('[data-a="subir"]').addEventListener('click', (e) => { e.stopPropagation(); cambiarPrioridad(a, +1); });
+  div.querySelector('[data-a="bajar"]').addEventListener('click', (e) => { e.stopPropagation(); cambiarPrioridad(a, -1); });
   div.querySelector('[data-a="fav"]').addEventListener('click', async () => {
     try {
       await api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ favorito: !a.favorito }) });
@@ -298,15 +420,51 @@ function cardNoticia(a) {
   return div;
 }
 
-$('buscar').addEventListener('input', () => cargarFeed());
+async function cambiarPrioridad(a, delta) {
+  const nueva = Math.max(1, Math.min(5, (Number(a.prioridad) || 3) + delta));
+  try {
+    await api(FEEDS, '/feeds/' + a.source_id, { method: 'PUT', body: JSON.stringify({ prioridad: nueva }) });
+    a.prioridad = nueva;
+    toast('Prioridad de ' + a.fuente + ': ' + nueva + '/5');
+    cargarFuentes();
+    cargarFeed();
+  } catch (e) { toast(e.message); }
+}
+
+let tBuscar;
+$('buscar').addEventListener('input', () => { clearTimeout(tBuscar); tBuscar = setTimeout(() => cargarFeed(), 300); });
 $('filtroHoras').addEventListener('change', () => cargarFeed());
 
 // ---------- MODAL ----------
+function sanearHTML(html) {
+  const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  doc.querySelectorAll('script,style,iframe,object,embed,link,meta,noscript,form,input,button').forEach((n) => n.remove());
+  doc.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      const n = attr.name.toLowerCase();
+      const v = String(attr.value || '');
+      if (el.tagName === 'IMG') {
+        if (n === 'src' && !/^https?:\/\//i.test(v)) el.remove();
+        else if (n !== 'src' && n !== 'alt') el.removeAttribute(attr.name);
+      } else if (el.tagName === 'A') {
+        if (n === 'href' && !/^https?:\/\//i.test(v)) el.removeAttribute(attr.name);
+        else if (n !== 'href') el.removeAttribute(attr.name);
+      } else {
+        el.removeAttribute(attr.name);
+      }
+    });
+    if (el.tagName === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener'); }
+    if (el.tagName === 'IMG') { el.setAttribute('loading', 'lazy'); el.setAttribute('referrerpolicy', 'no-referrer'); }
+  });
+  return doc.body.innerHTML;
+}
+
 function abrirArticulo(a) {
-  const tags = JSON.parse(a.etiquetas || '[]');
+  const tags = tagsDe(a);
   const titulo = a.titulo_es || a.titulo;
-  const resumen = a.resumen_es || a.contenido;
+  const resumen = a.resumen_es || String(a.contenido || '').slice(0, 400);
   const traducido = a.titulo_es && a.titulo_es !== a.titulo;
+  document.body.classList.add('modal-abierto');
   $('modalCuerpo').innerHTML = `
     ${a.imagen ? `<div class="media modal-media"><img src="${esc(a.imagen)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.style.display='none'"></div>` : ''}
     ${a.video ? `<div class="video-marco"><iframe src="${esc(a.video)}" title="video" frameborder="0" allowfullscreen loading="lazy"></iframe></div>` : ''}
@@ -315,7 +473,7 @@ function abrirArticulo(a) {
     ${traducido ? `<div class="titulo-original">Título original: ${esc(a.titulo)}</div>` : ''}
     <div class="meta">${esc(a.autor || 'Sin autor')} · ${a.fecha ? new Date(a.fecha).toLocaleString('es-MX') : ''} · ${tags.map((t) => '#' + esc(t)).join(' ')}</div>
     <div class="cuerpo" id="cuerpoArt">${esc(resumen)}</div>
-    <details class="contenido-original"><summary>📄 Ver contenido original del medio</summary><div>${esc(a.contenido)}</div></details>
+    <div class="cuerpo-original" id="cuerpoOriginal"><p class="cargando-original">⏳ Cargando contenido completo con imágenes…</p></div>
     <div id="resultadoIA"></div>
     <div class="acciones">
       <button id="mResumir">🤖 Resumir con IA</button>
@@ -323,10 +481,13 @@ function abrirArticulo(a) {
       ${traducido ? '<button id="mTraducir">🌐 Traducir contenido completo</button>' : ''}
       <button id="mRecorte">✂️ Guardar recorte</button>
       <button id="mLeido">✓ Marcar leído</button>
-      <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver original ↗</a>
+      <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver fuente ↗</a>
     </div>`;
   $('modal').classList.remove('oculto');
-  api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ leido: true }) }).then(() => cargarFeed()).catch(() => {});
+  api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ leido: true }) })
+    .then(() => { a.leido = 1; marcarCardLeida(a.id); })
+    .catch(() => {});
+  cargarOriginalEnModal(a);
 
   const btnTrad = $('mTraducir');
   if (btnTrad) btnTrad.addEventListener('click', async () => {
@@ -373,14 +534,55 @@ function abrirArticulo(a) {
     try {
       await api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ leido: true }) });
       toast('Marcado como leído ✓');
-      $('modal').classList.add('oculto');
-      cargarFeed();
+      a.leido = 1;
+      marcarCardLeida(a.id);
+      cerrarModal();
     } catch (e) { toast(e.message); }
   });
 }
 
-$('modalCerrar').addEventListener('click', () => $('modal').classList.add('oculto'));
-$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) $('modal').classList.add('oculto'); });
+function marcarCardLeida(id) {
+  const el = document.querySelector('.card-noticia[data-id="' + id + '"]');
+  if (el && !el.querySelector('.leido-ok')) {
+    const cab = el.querySelector('.cabecera');
+    if (cab) {
+      const s = document.createElement('span');
+      s.className = 'pastilla leido-ok';
+      s.textContent = '✓ leído';
+      cab.appendChild(s);
+    }
+  }
+}
+
+function cargarOriginalEnModal(a) {
+  const c = $('cuerpoOriginal');
+  if (!c) return;
+  c.classList.remove('oculto');
+  c.innerHTML = '<p class="cargando-original">⏳ Cargando contenido completo con imágenes…</p>';
+  const prom = (a.contenido_html === undefined || a.contenido_html === null)
+    ? api(FEEDS, '/articles/' + a.id).then((d) => {
+        a.contenido_html = d.articulo.contenido_html;
+        if (d.articulo.contenido) a.contenido = d.articulo.contenido;
+      })
+    : Promise.resolve();
+  prom.then(() => {
+    if ($('modal').classList.contains('oculto')) return;
+    c.innerHTML = a.contenido_html
+      ? sanearHTML(a.contenido_html)
+      : '<p>' + esc(a.contenido || 'Sin contenido original disponible.') + '</p>';
+  }).catch((e) => {
+    if ($('modal').classList.contains('oculto')) return;
+    c.innerHTML = '<p>❌ ' + esc(e.message) + '</p>';
+  });
+}
+
+function cerrarModal() {
+  $('modal').classList.add('oculto');
+  document.body.classList.remove('modal-abierto');
+}
+$('modalCerrar').addEventListener('click', cerrarModal);
+$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
 
 // ---------- DIGEST ----------
 $('btnDigest').addEventListener('click', async () => {
@@ -409,7 +611,7 @@ async function cargarArchivados() {
       div.innerHTML = `<div class="cabecera"><span class="pastilla">📡 ${esc(a.fuente)}</span></div>
         <h4>${esc(a.titulo)}</h4><div class="acciones">
         <button data-a="quitar">Sacar del archivo</button>
-        <a href="${esc(a.link)}" target="_blank" rel="noopener">Original ↗</a></div>`;
+        <a href="${esc(a.link)}" target="_blank" rel="noopener">Fuente ↗</a></div>`;
       div.querySelector('[data-a="quitar"]').addEventListener('click', async () => {
         try {
           await api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ archivado: false }) });
@@ -426,7 +628,7 @@ async function cargarArchivados() {
       div.innerHTML = `<div class="cabecera"><span class="pastilla">✂️ ${esc(c.medio || '')}</span></div>
         <h4>${esc(c.titulo)}</h4><div class="extracto">${esc(c.texto)}</div>
         <div class="acciones"><button data-a="borrar">🗑 Borrar</button>
-        <a href="${esc(c.link)}" target="_blank" rel="noopener">Original ↗</a></div>`;
+        <a href="${esc(c.link)}" target="_blank" rel="noopener">Fuente ↗</a></div>`;
       div.querySelector('[data-a="borrar"]').addEventListener('click', async () => {
         try {
           await api(FEEDS, '/clips/' + c.id, { method: 'DELETE' });

@@ -64,6 +64,10 @@
           </select>
           <button id="btnRefrescar" class="btn-secundario">🔄 Actualizar</button>
         </div>
+        <details class="prioridades-panel" id="prioridadesPanel">
+          <summary>🎛 Prioridades de tus fuentes <small>— el orden afecta tu Para Ti</small></summary>
+          <div id="prioridadesLista" class="prioridades-lista"></div>
+        </details>
         <div id="feedInfo" class="feed-info"></div>
         <div id="cajaDigest" class="digest oculto"></div>
         <div id="feedLista" class="lista-cards"><p class="vacio">Cargando noticias…</p></div>
@@ -86,6 +90,11 @@
             <button class="preset" data-n="PC Gamer" data-u="https://www.pcgamer.com/rss/">+ PC Gamer</button>
             <button class="preset" data-n="IGN" data-u="https://feeds.feedburner.com/ign/games-all">+ IGN</button>
           </div>
+        </div>
+        <div class="card-form">
+          <h3>📚 Catálogo de portales tech <small class="msg-inline">(150+ fuentes listas para agregar)</small></h3>
+          <input type="text" id="buscadorCatalogo" class="buscador-catalogo" placeholder="🔍 Buscar por nombre o tema… (ej: Linux, IA, seguridad, gamer)" />
+          <div id="catalogoCaja" class="catalogo-caja"></div>
         </div>
         <div id="fuentesLista" class="lista-fuentes"></div>
       </section>
@@ -201,6 +210,7 @@
 
   <div id="toast" class="toast oculto"></div>
 
+  <script src="catalogo.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

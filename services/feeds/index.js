@@ -54,10 +54,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS clips(
 )`);
 
 const TAXONOMIA = [
-  'Sistemas Operativos', 'Ciberseguridad', 'Frameworks', 'Lanzamientos',
-  'Actualizaciones', 'Herramientas', 'Inteligencia Artificial', 'Hardware',
-  'Videojuegos', 'eSports', 'Deportes', 'Ciencias', 'Educación',
-  'Seguridad', 'Cine y Series', 'Música', 'Política', 'Economía', 'General'
+  'Inteligencia Artificial', 'Ciberseguridad', 'Sistemas Operativos',
+  'Desarrollo Web', 'Programación', 'Bases de Datos', 'Móviles',
+  'Nube (Cloud)', 'DevOps', 'Redes', 'Hardware', 'Software',
+  'Lanzamientos', 'Actualizaciones', 'Herramientas', 'Open Source',
+  'Ciencia de Datos', 'Robótica', 'Espacio', 'Ciencias',
+  'Videojuegos', 'eSports', 'Economía', 'Empresas', 'Educación',
+  'Deportes', 'Cine y Series', 'Música', 'Política', 'General'
 ];
 
 const parser = new Parser({
@@ -75,7 +78,7 @@ const parser = new Parser({
 function columnas(tabla) {
   return db.prepare(`PRAGMA table_info(${tabla})`).all().map((c) => c.name);
 }
-const COLS_ART = ['imagen', 'video', 'titulo_es', 'resumen_es', 'idioma'];
+const COLS_ART = ['imagen', 'video', 'titulo_es', 'resumen_es', 'idioma', 'contenido_html'];
 for (const c of COLS_ART) {
   if (!columnas('articles').includes(c)) db.exec(`ALTER TABLE articles ADD COLUMN ${c} TEXT`);
 }
@@ -132,26 +135,38 @@ function auth(req, res, next) {
 function etiquetar(titulo, texto) {
   const t = ((titulo || '') + ' ' + (texto || '')).toLowerCase();
   const reglas = [
-    ['Sistemas Operativos', /linux|kernel|ubuntu|debian|fedora|windows 1[01]|macos|distro|gnome|kde|wayland/],
-    ['Ciberseguridad', /seguridad|vulnerab|cve-|ransomware|malware|phishing|hack|brecha|cifrado|exploit/],
-    ['Inteligencia Artificial', /inteligi| ia |llm|gpt|openai|modelo de|deepseek|machine learning|gemini/],
-    ['Frameworks', /framework|react|angular|vue|svelte|next\.?js|django|laravel|rails/],
+    ['Inteligencia Artificial', /(^|[^a-zá])ia([^a-zá]|$)|inteligi|llm|gpt|openai|deepseek|gemini|copilot|machine learning|modelo de lenguaje|chatbot|neural/],
+    ['Ciberseguridad', /vulnerab|cve-|ransomware|malware|phishing|hack|brecha|cifrado|exploit|zero.?day|insegur/],
+    ['Sistemas Operativos', /linux|kernel|ubuntu|debian|fedora|arch linux|windows 1[012]|macos|distro|gnome|kde|wayland/],
+    ['Desarrollo Web', /react|angular|vue|svelte|next\.?js|nuxt|django|laravel|rails|frontend|backend|javascript|typescript|web ?dev|wordpress/],
+    ['Programación', /programad|código|codigo|python|rust|golang|c\+\+|compilador|algoritmo|scripting/],
+    ['Bases de Datos', /base de datos|sql|postgres|mysql|mongodb|redis|sqlite|oracle/],
+    ['Móviles', /android|iphone|ios\b|smartphone|aplicación móvil|app móvil|pixel|galaxy|play store|app store/],
+    ['Nube (Cloud)', /cloud|nube |aws|azure|google cloud|servidor|hosting|kubernetes|contenedor/],
+    ['DevOps', /devops|ci\/cd|pipeline|docker|jenkins|terraform|ansible|despliegue|deploy/],
+    ['Redes', /wifi|5g|internet|isp|banda ancha|router|fibra óptica|starlink/],
+    ['Hardware', /gpu|cpu|nvidia|amd |intel |ryzen|radeon|tarjeta gráfica|monitor|ssd|portátil|laptop|procesador|memoria ram/],
+    ['Software', /software|aplicación|navegador|chrome|firefox|edge|vs ?code/],
+    ['Lanzamientos', /lanz|estrena|disponible|nueva versión|release|anuncia|presentó|debut/],
     ['Actualizaciones', /actualiz|update|parche|patch|hotfix|corrig/],
-    ['Lanzamientos', /lanz|estrena|disponible|nuevo versión|release|anuncia/],
-    ['Herramientas', /herramienta|vs ?code|docker|git |terminal|editor|plugin|extensi/],
-    ['Hardware', /gpu|cpu|nvidia|amd |intel |ryzen|tarjeta gráfica|monitor|portátil|laptop|ssd/],
+    ['Herramientas', /herramienta|terminal|editor|plugin|extensión|librería|sdk/],
+    ['Open Source', /open source|código abierto|opensource|comunidad de código/],
+    ['Ciencia de Datos', /data s|analytics|estadíst|big data|visualización de datos/],
+    ['Robótica', /robot|robót|dron/],
+    ['Espacio', /nasa|espacio|astronáut|cohete|satélite|marte|spacex|orbital/],
+    ['Ciencias', /cienc|física|biolog|investigac|científic/],
     ['Videojuegos', /juego|gaming|steam|playstation|xbox|nintendo|consola|gameplay|trailer|epic games/],
-    ['eSports', /esport|torneo|competic|liga de|campeonato/],
-    ['Deportes', /fútbol|futbol|nba|nfl|tenis|olímpic|selección|gol |liga /],
-    ['Ciencias', /cienc|nasa|espacio|astrónom|física|biolog|investigac/],
+    ['eSports', /esport|torneo|competic|campeonato|liga de/],
+    ['Economía', /econom|mercado|inflaci|cripto|bitcoin|dólar|bolsa|inversión|financ/],
+    ['Empresas', /empresa|google|microsoft|apple|meta|amazon|tesla|startup|ceo|despid|adquisi/],
     ['Educación', /educac|beca|universidad|escuela|curso|certific|academ/],
-    ['Cine y Series', /película|pelicula|serie |netflix|hbo|disney\+|estreno|actor|tráiler/],
+    ['Deportes', /fútbol|futbol|nba|nfl|tenis|olímpic|gol |liga /],
+    ['Cine y Series', /película|pelicula|serie |netflix|hbo|disney\+|actor|tráiler/],
     ['Música', /música|musica|álbum|album|artista|gira|concierto|spotify/],
-    ['Política', /polític|gobierno|elecc|senado|president|congreso/],
-    ['Economía', /econom|mercado|inflaci|precio|bolsa|cripto|bitcoin|dólar/]
+    ['Política', /polític|gobierno|elecc|senado|president|congreso/]
   ];
   const tags = reglas.filter(([, re]) => re.test(t)).map(([t]) => t);
-  return tags.length ? tags : ['General'];
+  return tags.length ? tags.slice(0, 4) : ['General'];
 }
 
 async function reclasificarConIA(items) {
@@ -194,24 +209,26 @@ async function importarFuente(src, feedYaParseado) {
     if (!it.link) continue;
     const bruto = it['content:encoded'] || it.content || it.contentSnippet || it.summary || '';
     const contenido = htmlATexto(bruto).slice(0, 4000);
+    const contenidoHtml = bruto && /<[a-z][\s\S]*>/i.test(String(bruto)) ? String(bruto).slice(0, 20000) : null;
     const imagen = imagenDe(it, bruto);
     const video = videoDe(it, bruto);
 
-    const existe = db.prepare('SELECT id, imagen, video, contenido FROM articles WHERE source_id=? AND link=?').get(src.id, it.link);
+    const existe = db.prepare('SELECT id, imagen, video, contenido, contenido_html FROM articles WHERE source_id=? AND link=?').get(src.id, it.link);
     if (existe) {
       const cambios = [];
       const args = [];
       if (!existe.imagen && imagen) { cambios.push('imagen=?'); args.push(imagen); }
       if (!existe.video && video) { cambios.push('video=?'); args.push(video); }
+      if (!existe.contenido_html && contenidoHtml) { cambios.push('contenido_html=?'); args.push(contenidoHtml); }
       if (contenido.length > String(existe.contenido || '').length) { cambios.push('contenido=?'); args.push(contenido); }
       if (cambios.length) db.prepare(`UPDATE articles SET ${cambios.join(',')} WHERE id=?`).run(...args, existe.id);
       continue;
     }
 
     const etiquetas = etiquetar(it.title, contenido);
-    const r = db.prepare(`INSERT OR IGNORE INTO articles(user_id,source_id,titulo,link,contenido,autor,fecha,etiquetas,imagen,video)
-                VALUES(?,?,?,?,?,?,?,?,?,?)`)
-      .run(src.user_id, src.id, it.title || '(sin título)', it.link, contenido,
+    const r = db.prepare(`INSERT OR IGNORE INTO articles(user_id,source_id,titulo,link,contenido,contenido_html,autor,fecha,etiquetas,imagen,video)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(src.user_id, src.id, it.title || '(sin título)', it.link, contenido, contenidoHtml,
         it.creator || it.author || it['dc:creator'] || feed.title || src.nombre,
         it.isoDate || it.pubDate || new Date().toISOString(), JSON.stringify(etiquetas), imagen, video);
     if (r.changes) {
@@ -348,9 +365,122 @@ app.get('/articles', auth, (req, res) => {
   if (tag) { sql += ' AND a.etiquetas LIKE ?'; args.push('%"' + tag + '"%'); }
   if (q) { sql += ' AND (a.titulo LIKE ? OR a.contenido LIKE ?)'; args.push('%' + q + '%', '%' + q + '%'); }
   sql += ' ORDER BY a.fecha DESC LIMIT 100';
-  const rows = db.prepare(sql).all(...args).map((r) => Object.assign(r, { etiquetas: JSON.parse(r.etiquetas || '[]') }));
+  const rows = db.prepare(sql).all(...args).map((r) => {
+    delete r.contenido_html; // pesa hasta 20 KB — solo se pide al abrir el modal
+    return Object.assign(r, { etiquetas: JSON.parse(r.etiquetas || '[]') });
+  });
   res.json({ articulos: rows });
 });
+
+app.get('/articles/:id', auth, async (req, res) => {
+  const a = db.prepare(`SELECT a.*, s.nombre AS fuente, s.prioridad FROM articles a
+    JOIN sources s ON s.id=a.source_id WHERE a.id=? AND a.user_id=?`).get(req.params.id, req.user.id);
+  if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
+  // Si el RSS no trajo el HTML con imágenes (o es de antes del guardado), ir a por él a la web original
+  if (!a.contenido_html && a.link) {
+    const html = await enriquecerDesdeWeb(a.link);
+    if (html) {
+      db.prepare('UPDATE articles SET contenido_html=? WHERE id=?').run(html, a.id);
+      a.contenido_html = html;
+    }
+  }
+  res.json({ articulo: a });
+});
+
+// Extrae un <div> cuya class coincida con el regex, respetando anidamiento de divs
+function extraerDivPorClase(html, claseRe) {
+  const m = html.match(new RegExp('<div[^>]+(?:class|id)=["\'][^"\']*' + claseRe + '[^"\']*["\'][^>]*>', 'i'));
+  if (!m) return null;
+  const inicio = m.index;
+  let depth = 0;
+  const re = /<div\b|<\/div>/gi;
+  re.lastIndex = inicio;
+  let mm;
+  while ((mm = re.exec(html))) {
+    if (mm[0].toLowerCase() === '<div') depth++;
+    else {
+      depth--;
+      if (depth === 0) return html.slice(inicio, mm.index + mm[0].length);
+    }
+  }
+  return html.slice(inicio, inicio + 30000);
+}
+
+async function enriquecerDesdeWeb(url) {
+  try {
+    if (!/^https?:\/\//i.test(url)) return null;
+    const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+    let html = null;
+    // 1) Directo
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }, redirect: 'follow', signal: AbortSignal.timeout(7000) });
+      if (r.ok) {
+        const t = await r.text();
+        if (!/just a moment|cf_chl|challenge-platform/i.test(t)) html = t;
+      }
+    } catch {}
+    // 2) AllOrigins (lee la página aunque Cloudflare bloquee)
+    if (!html) {
+      try {
+        const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
+        if (r.ok) {
+          const t = await r.text();
+          if (!/just a moment|cf_chl/i.test(t)) html = t;
+        }
+      } catch {}
+    }
+    // 3) Jina reader (devuelve markdown → lo convertimos a HTML)
+    if (!html) {
+      try {
+        const r = await fetch('https://r.jina.ai/' + url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
+        if (r.ok) {
+          const md = await r.text();
+          if (md && md.length > 400) {
+            html = md
+              .replace(/^Title:.*$/m, '').replace(/^URL Source:.*$/m, '').replace(/^Published Time:.*$/m, '').replace(/^Markdown Content:.*$/m, '')
+              .replace(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<img src="$2" alt="$1">')
+              .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>')
+              .split(/\n{2,}/).map((p) => '<p>' + p.trim().replace(/\n/g, '<br>') + '</p>').join('\n');
+          }
+        }
+      } catch {}
+    }
+    if (!html || !/<img|<video|<iframe/i.test(html)) return null;
+    let cuerpo = '';
+    // 1) El div del cuerpo del post (preciso, excluye widgets de Blogger/THN)
+    cuerpo = extraerDivPorClase(html, '(?:post-body|entry-content|article-content|story-body|node-content|main-content|article-body)') || '';
+    // 2) <article> solo si es grande
+    if (!cuerpo || cuerpo.length < 800) {
+      const art = html.match(/<article[\s\S]*?<\/article>/i);
+      if (art && art[0].length > 1500) cuerpo = art[0];
+    }
+    // 3) body completo de último recurso
+    if (!cuerpo || cuerpo.length < 800) {
+      const b = html.match(/<body[\s\S]*<\/body>/i);
+      cuerpo = b ? b[0] : html;
+    }
+    // Cortar en el primer widget de "fin de artículo" (relacionados, más leídos, recomendados…)
+    const finArt = cuerpo.search(/<(?:div|section|aside|ul)[^>]+(?:class|id)=["'][^"']*(?:below-post|related-post|related-stories|related-content|read-more|more-articles|recommended|expert-insight|popular-post|you-may|trending)/i);
+    if (finArt > 400) cuerpo = cuerpo.slice(0, finArt);
+    cuerpo = cuerpo.replace(/<(?:h2|h3|div|span)[^>]*>\s*(?:Related Posts?|You May Also|Recommended|SHARE THIS|Trending|Popular Posts?|Read More)[^<]{0,50}<\/(?:h2|h3|div|span)>[\s\S]*$/i, ' ');
+    // Quitar todo lo que NO es el cuerpo de la noticia: widgets, redes, anuncios, comentarios
+    cuerpo = cuerpo
+      .replace(/<(div|aside|section|ul|figure)[^>]+(?:class|id)=["'][^"']*(?:related|popular|share|social|advert|comment|widget|promo|sidebar|newsletter|subscribe|readmore|more-stories|below-post|author-bio|post-footer|cloud|cookie|popup|modal|dog_|sponsored)[^"']*["'][\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<a[^>]+rel=["'][^"']*sponsored[^"']*["'][\s\S]*?<\/a>/gi, ' ')
+      .replace(/<iframe[^>]*src=["']([^"']+)["'][^>]*>[\s\S]*?<\/iframe>/gi, (m, src) => (/youtube|youtu\.be|vimeo|player\.vimeo/i.test(src) ? m : ' '))
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+      .replace(/<form[\s\S]*?<\/form>/gi, ' ')
+      .slice(0, 40000);
+    if (cuerpo.length < 400) return null;
+    return cuerpo;
+  } catch {
+    return null;
+  }
+}
 
 app.get('/feed', auth, (req, res) => {
   const horas = Number(req.query.horas || 168);
@@ -392,7 +522,7 @@ app.get('/feed', auth, (req, res) => {
     relleno = true;
   }
   res.json({
-    articulos: lista.slice(0, 60).map((x) => x.r),
+    articulos: lista.slice(0, 60).map((x) => { delete x.r.contenido_html; return x.r; }),
     total,
     conInteres,
     sinIntereses: total - conInteres,
