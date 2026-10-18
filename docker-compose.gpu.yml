@@ -1,0 +1,21 @@
+# ============================================================================
+#  Portal IA News — sobrecapa para dar GPU al contenedor de Ollama
+#
+#  Requiere el NVIDIA Container Toolkit instalado en la PC (CachyOS/Arch):
+#     sudo pacman -S nvidia-container-toolkit
+#     sudo nvidia-ctk runtime configure --runtime=docker
+#     sudo systemctl restart docker
+#
+#  Uso:
+#     docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+# ============================================================================
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

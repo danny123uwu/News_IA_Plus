@@ -1,0 +1,132 @@
+# ============================================================================
+#  Portal IA News — docker-compose
+#  Levanta TODO el sistema en contenedores separados + el proxy Nginx:
+#
+#     navegador  ->  nginx (puerto 80)  ->  web    (frontend)
+#                                       ->  auth   (login/JWT/perfil)
+#                                       ->  feeds  (RSS/artículos/feed)
+#                                       ->  agente (IA)  ->  ollama
+#
+#  Uso normal:   docker compose up -d --build
+#  Abrir:        http://localhost
+# ============================================================================
+
+name: portal-ianews
+
+services:
+
+  # ---------------- Proxy inverso: única puerta de entrada ----------------
+  nginx:
+    image: nginx:stable-alpine
+    container_name: ianews-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      web:    { condition: service_healthy }
+      auth:   { condition: service_healthy }
+      feeds:  { condition: service_healthy }
+      agente: { condition: service_healthy }
+    restart: ${RESTART_POLICY:-no}
+
+  # ------------------------------- Frontend -------------------------------
+  web:
+    build: .
+    image: portal-ianews-app
+    container_name: ianews-web
+    command: node web/index.js
+    user: "1000:1000"
+    expose: ["8090"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: ${RESTART_POLICY:-no}
+
+  # --------------------- Microservicio: Auth (3001) ----------------------
+  auth:
+    build: .
+    image: portal-ianews-app
+    container_name: ianews-auth
+    command: node services/auth/index.js
+    user: "1000:1000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+    volumes:
+      - ./data:/app/data
+    expose: ["3001"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: ${RESTART_POLICY:-no}
+
+  # -------------------- Microservicio: Feeds (3002) ----------------------
+  feeds:
+    build: .
+    image: portal-ianews-app
+    container_name: ianews-feeds
+    command: node services/feeds/index.js
+    user: "1000:1000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+      - AGENT_URL=http://agente:3003        # habla con el agente por nombre de servicio
+    volumes:
+      - ./data:/app/data
+    expose: ["3002"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: ${RESTART_POLICY:-no}
+
+  # ------------------- Microservicio: Agente IA (3003) -------------------
+  agente:
+    build: .
+    image: portal-ianews-app
+    container_name: ianews-agente
+    command: node services/agent/index.js
+    user: "1000:1000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+      - FEEDS_URL=http://feeds:3002         # habla con feeds por nombre de servicio
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+    volumes:
+      - ./data:/app/data
+    expose: ["3003"]
+    # Permite que el contenedor alcance un Ollama instalado en tu PC (ver .env)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: ${RESTART_POLICY:-no}
+
+  # ---------------------- IA local (Ollama en contenedor) ----------------
+  # Arranca "vacío": hay que bajar los modelos una vez con:
+  #   docker compose exec ollama ollama pull qwen2.5-coder:3b
+  #   docker compose exec ollama ollama pull llama3.1:8b
+  # Para usar la GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ianews-ollama
+    environment:
+      # Un solo modelo en memoria y sin paralelismo (evita consumo desmedido de RAM)
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+      # Descarga el modelo de la memoria al terminar cada consulta (0 = inmediato).
+      # Ajustable en .env; por defecto 30s para no recargarlo en cada pregunta seguida.
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30s}
+    volumes:
+      - ollama_modelos:/root/.ollama
+    expose: ["11434"]
+    restart: ${RESTART_POLICY:-no}
+
+volumes:
+  ollama_modelos:

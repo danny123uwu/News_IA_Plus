@@ -1,0 +1,25 @@
+# No copiar a la imagen (se generan/montan aparte)
+node_modules
+data
+new
+.git
+.gitignore
+
+# Basura del sistema
+*.log
+.DS_Store
+.directory
+
+# Variables de entorno (las reales se pasan por docker-compose)
+.env
+.env.*
+
+# Archivos de trabajo
+Dockerfile
+docker-compose*.yml
+deploy
+
+# Backups y temporales
+*.bak
+*.orig
+tmp

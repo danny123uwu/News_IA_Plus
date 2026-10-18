@@ -1,17 +1,58 @@
-# Dependencias
+# ============================================================================
+#  Portal IA News — .gitignore
+# ============================================================================
+
+# --- Dependencias ---------------------------------------------------------
 node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
 
-# Datos sensibles: bases de datos, llaves API, uploads
+# --- Datos locales / sensibles (NO subir nunca) ---------------------------
+# Acá viven las bases de datos y las llaves API de cada usuario.
 data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 
-# Entorno virtual de Python
-new/
-
-# Archivos del sistema
-.directory
-.DS_Store
-*.log
-
-# Variables de entorno
+# --- Variables de entorno -------------------------------------------------
 .env
 .env.*
+!.env.example
+
+# --- Entorno virtual de Python --------------------------------------------
+new/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# --- Logs -----------------------------------------------------------------
+*.log
+logs/
+
+# --- Sistema / editor -----------------------------------------------------
+.DS_Store
+.directory
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# --- Backups y temporales -------------------------------------------------
+*.bak
+*.orig
+*.tmp
+*.temp
+/tmp/
+
+# --- Ollama / modelos descargados -----------------------------------------
+# (los modelos van dentro del contenedor o de tu ~/.ollama, no al repo)
+*.gguf

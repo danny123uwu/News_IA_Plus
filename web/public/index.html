@@ -29,12 +29,19 @@
     <header class="topbar">
       <div class="logo">📰 Portal <span class="acento">IA</span> News</div>
       <div class="buscador">
-        <input type="text" id="buscar" placeholder="Buscar noticias..." />
+        <input type="text" id="buscar" placeholder="Buscar noticias… (Enter para fijar la búsqueda)" />
+        <button type="button" id="btnLimpiarBusqueda" class="limpiar-busqueda oculto" title="Limpiar búsqueda">✖</button>
       </div>
       <div class="usuario">
         <button id="motorTop" class="chip-motor" title="Motor de IA activo — clic para configurar">⚙️ …</button>
-        <img id="fotoTop" class="avatar" src="" alt="" onerror="this.style.display='none'" />
-        <span id="nombreTop"></span>
+        <label class="tema-picker" title="Tema de color del portal">
+          <span class="ico">🎨</span>
+          <select id="temaTop" aria-label="Tema de color"></select>
+        </label>
+        <button id="btnPerfilTop" class="perfil-top" title="Ver mi perfil">
+          <img id="fotoTop" class="avatar" src="" alt="" onerror="this.style.display='none'" />
+          <span id="nombreTop"></span>
+        </button>
         <button id="btnSalir" class="btn-icono" title="Salir">⏻</button>
       </div>
     </header>
@@ -43,29 +50,29 @@
     <div class="burbujas" id="burbujas"></div>
 
     <nav class="nav">
-      <button class="tab active" data-vista="feed">✨ Para Ti</button>
-      <button class="tab" data-vista="fuentes">📡 Mis fuentes</button>
-      <button class="tab" data-vista="archivados">📁 Archivados</button>
-      <button class="tab" data-vista="perfil">👤 Mi perfil</button>
-      <button class="tab" data-vista="panel">📊 Panel</button>
-      <button class="tab" data-vista="ia">⚙️ IA</button>
+      <button class="tab active" data-vista="feed"><span class="ico">✨</span> Para Ti</button>
+      <button class="tab" data-vista="fuentes"><span class="ico">📡</span> Mis fuentes</button>
+      <button class="tab" data-vista="archivados"><span class="ico">📁</span> Archivados</button>
+      <button class="tab" data-vista="perfil"><span class="ico">👤</span> Mi perfil</button>
+      <button class="tab" data-vista="panel"><span class="ico">📊</span> Panel</button>
+      <button class="tab" data-vista="ia"><span class="ico">⚙️</span> IA</button>
     </nav>
 
     <main>
       <!-- FEED -->
       <section id="v-feed" class="vista">
         <div class="barra-feed">
-          <button id="btnDigest" class="btn-destacado">☀️ Digest de hoy</button>
+          <button id="btnDigest" class="btn-destacado"><span class="ico">☀️</span> Digest de hoy</button>
           <select id="filtroHoras">
             <option value="24">Últimas 24 horas</option>
             <option value="72">Últimos 3 días</option>
             <option value="168" selected>Última semana</option>
             <option value="720">Último mes</option>
           </select>
-          <button id="btnRefrescar" class="btn-secundario">🔄 Actualizar</button>
+          <button id="btnRefrescar" class="btn-secundario"><span class="ico">🔄</span> Actualizar</button>
         </div>
         <details class="prioridades-panel" id="prioridadesPanel">
-          <summary>🎛 Prioridades de tus fuentes <small>— el orden afecta tu Para Ti</small></summary>
+          <summary><span class="ico">🎛</span> Prioridades de tus fuentes <small>— el orden afecta tu Para Ti</small></summary>
           <div id="prioridadesLista" class="prioridades-lista"></div>
         </details>
         <div id="feedInfo" class="feed-info"></div>
@@ -76,7 +83,7 @@
       <!-- FUENTES -->
       <section id="v-fuentes" class="vista oculto">
         <div class="card-form">
-          <h3>Agregar portal</h3>
+          <h3><span class="ico">➕</span> Agregar portal</h3>
           <div class="fila">
             <input type="text" id="fuenteNombre" placeholder="Nombre (ej: Hacker News)" />
             <input type="url" id="fuenteUrl" placeholder="https://.../rss" />
@@ -92,7 +99,7 @@
           </div>
         </div>
         <div class="card-form">
-          <h3>📚 Catálogo de portales tech <small class="msg-inline">(150+ fuentes listas para agregar)</small></h3>
+          <h3><span class="ico">📚</span> Catálogo de portales tech <small class="msg-inline">(150+ fuentes listas para agregar)</small></h3>
           <input type="text" id="buscadorCatalogo" class="buscador-catalogo" placeholder="🔍 Buscar por nombre o tema… (ej: Linux, IA, seguridad, gamer)" />
           <div id="catalogoCaja" class="catalogo-caja"></div>
         </div>
@@ -101,16 +108,16 @@
 
       <!-- ARCHIVADOS -->
       <section id="v-archivados" class="vista oculto">
-        <h3>📄 Noticias archivadas</h3>
+        <h3><span class="ico">📄</span> Noticias archivadas</h3>
         <div id="archivadosLista" class="lista-cards"></div>
-        <h3>✂️ Mis recortes</h3>
+        <h3><span class="ico">✂️</span> Mis recortes</h3>
         <div id="recortesLista" class="lista-cards"></div>
       </section>
 
       <!-- PERFIL -->
       <section id="v-perfil" class="vista oculto">
         <div class="card-form">
-          <h3>Mi perfil</h3>
+          <h3><span class="ico">👤</span> Mi perfil</h3>
           <div class="perfil-fila">
             <img id="fotoPerfil" class="avatar-grande" src="" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22><rect width=%2290%22 height=%2290%22 fill=%22%23333%22/><text x=%2245%22 y=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>👤</text></svg>'" />
             <div>
@@ -121,10 +128,25 @@
           </div>
         </div>
         <div class="card-form">
-          <h3>Mis intereses (temas de mi feed)</h3>
+          <h3><span class="ico">🎨</span> Tema de color</h3>
+          <p class="msg">Elegí una combinación de colores. Se guarda en tu cuenta y se aplica en todos tus dispositivos.</p>
+          <div id="temaCaja" class="chips-tema"></div>
+          <p class="msg" id="temaMsg"></p>
+        </div>
+        <div class="card-form">
+          <h3><span class="ico">🏷️</span> Mis intereses (temas de mi feed)</h3>
           <p class="msg">Estos temas <b>ordenan</b> tu feed: lo que elijas aparece primero. No lo vacían.</p>
           <div id="interesesCaja" class="chips-seleccion"></div>
           <p class="msg" id="interesesMsg"></p>
+        </div>
+        <div class="card-form">
+          <h3><span class="ico">🌐</span> Idioma de las noticias</h3>
+          <p class="msg">En <b>Español</b>, las noticias que vengan en otro idioma se traducen automáticamente (título y cuerpo). Elegí <b>English</b> para verlas en su idioma original.</p>
+          <select id="perfilIdioma">
+            <option value="es">Español</option>
+            <option value="en">English (original)</option>
+          </select>
+          <p class="msg" id="idiomaMsg"></p>
         </div>
       </section>
 
@@ -132,18 +154,18 @@
       <section id="v-panel" class="vista oculto">
         <div id="statsCaja" class="stats"></div>
         <div class="card-form">
-          <h3>Leídos por portal</h3>
+          <h3><span class="ico">📡</span> Leídos por portal</h3>
           <div id="barrasFuente" class="barras"></div>
         </div>
         <div class="card-form">
-          <h3>Temas más frecuentes</h3>
+          <h3><span class="ico">🔥</span> Temas más frecuentes</h3>
           <div id="barrasEtiqueta" class="barras"></div>
         </div>
       </section>
       <!-- IA -->
       <section id="v-ia" class="vista oculto">
         <div class="card-form">
-          <h3>⚙️ Motor de inteligencia artificial</h3>
+          <h3><span class="ico">⚙️</span> Motor de inteligencia artificial</h3>
           <p class="msg" id="iaEstado">Cargando…</p>
           <div class="ia-motor">
             <label class="ia-op">
@@ -152,26 +174,34 @@
             </label>
             <label class="ia-op">
               <input type="radio" name="motorIA" value="api" />
-              <span><b>☁️ API externa</b><br /><small>Cualquier proveedor compatible con OpenAI (Gemini, Groq, OpenRouter…).</small></span>
+              <span><b>☁️ API externa</b><br /><small>Cualquier proveedor compatible con OpenAI (Google AI Studio/Gemini, Claude, Groq, OpenRouter…).</small></span>
             </label>
           </div>
+
+          <p class="msg">Con <b>API externa</b>, la IA local <b>no se usa</b> (ni para clasificar ni para traducir): tu PC no toca la GPU.</p>
+          <label class="ia-check">
+            <input type="checkbox" id="iaRespaldoLocal" />
+            <span>Usar la <b>IA local</b> como respaldo si falla la API <small>(opcional; si lo activás, la GPU puede volver a usarse)</small></span>
+          </label>
 
           <div id="iaApiCaja" class="oculto">
             <div class="fila">
               <select id="iaProveedor" title="Proveedor"></select>
-              <input type="text" id="iaModelo" placeholder="modelo (ej: gemini-2.0-flash)" />
+              <select id="iaModeloLista" class="oculto" title="Modelos de tu API"></select>
             </div>
+            <input type="text" id="iaModelo" placeholder="modelo (ej: gemini-2.5-flash) — o elegí de la lista de arriba" autocomplete="off" />
             <input type="text" id="iaBaseUrl" placeholder="URL base de la API" />
             <input type="password" id="iaKey" placeholder="API key" autocomplete="off" />
             <div class="fila">
-              <button id="btnProbarApi" class="btn-secundario" type="button">🧪 Probar API</button>
+              <button id="btnVerModelos" class="btn-secundario" type="button"><span class="ico">🔄</span> Ver modelos</button>
+              <button id="btnProbarApi" class="btn-secundario" type="button"><span class="ico">🧪</span> Probar API</button>
             </div>
             <p class="msg" id="iaApiMsg"></p>
           </div>
         </div>
 
         <div class="card-form">
-          <h3>Modelos por tarea</h3>
+          <h3><span class="ico">🧠</span> Modelos por tarea</h3>
           <p class="msg">Cada tarea usa <b>un solo</b> modelo (uno a la vez, sin sobrecargar la PC). Con <b>⭐</b> está lo recomendado para tu equipo.</p>
           <div class="ia-tarea">
             <label for="iaClasificar">🏷️ Clasificar etiquetas <small>— rápido, corre en lote al importar</small></label>
@@ -182,18 +212,19 @@
             <select id="iaResumir"></select>
           </div>
           <p class="msg" id="iaModelosMsg"></p>
+          <div id="iaDescargas" class="oculto"></div>
         </div>
 
         <div class="card-form">
-          <h3>🌐 Traducción al español</h3>
+          <h3><span class="ico">🌐</span> Traducción al español</h3>
           <label class="ia-radio"><input type="radio" name="tradMotor" value="google" /> Google Translate <small>(gratis, sin key, 0.16 s)</small></label>
           <label class="ia-radio"><input type="radio" name="tradMotor" value="motor" /> Usar el motor elegido arriba</label>
           <p class="msg" id="iaTradMsg"></p>
         </div>
 
         <div class="fila">
-          <button id="btnGuardarIA">💾 Guardar configuración</button>
-          <button id="btnProbarIA" class="btn-secundario">🧪 Probar resumen</button>
+          <button id="btnGuardarIA"><span class="ico">💾</span> Guardar configuración</button>
+          <button id="btnProbarIA" class="btn-secundario"><span class="ico">🧪</span> Probar resumen</button>
         </div>
         <p class="msg" id="iaMsg"></p>
       </section>

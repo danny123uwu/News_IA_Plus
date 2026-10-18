@@ -29,6 +29,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS users(
   creado TEXT DEFAULT (datetime('now'))
 )`);
 
+// Preferencia de idioma de las noticias (por defecto: español)
+if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('idioma')) {
+  db.exec("ALTER TABLE users ADD COLUMN idioma TEXT DEFAULT 'es'");
+}
+
+// Tema visual del frontend (por defecto: azul oscuro)
+const TEMAS = ['oscuro', 'claro', 'cian', 'purpura', 'celeste', 'rojo', 'verde', 'naranja'];
+if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('tema')) {
+  db.exec("ALTER TABLE users ADD COLUMN tema TEXT DEFAULT 'oscuro'");
+}
+
 function hash(p) {
   const s = crypto.randomBytes(16).toString('hex');
   return s + ':' + crypto.scryptSync(p, s, 64).toString('hex');
@@ -41,7 +52,7 @@ function sign(u) {
   return jwt.sign({ id: u.id, email: u.email, rol: u.rol }, SECRET, { expiresIn: '8h' });
 }
 function publicUser(u) {
-  return { id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, foto: u.foto, intereses: JSON.parse(u.intereses || '[]') };
+  return { id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, foto: u.foto, intereses: JSON.parse(u.intereses || '[]'), idioma: u.idioma || 'es', tema: u.tema || 'oscuro' };
 }
 function auth(req, res, next) {
   try {
@@ -81,12 +92,14 @@ app.get('/me', auth, (req, res) => {
 });
 
 app.put('/me', auth, (req, res) => {
-  const { nombre, intereses } = req.body || {};
+  const { nombre, intereses, idioma, tema } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-  db.prepare('UPDATE users SET nombre=?, intereses=? WHERE id=?').run(
+  db.prepare('UPDATE users SET nombre=?, intereses=?, idioma=?, tema=? WHERE id=?').run(
     nombre !== undefined ? String(nombre) : u.nombre,
     intereses !== undefined ? JSON.stringify(intereses) : u.intereses,
+    idioma !== undefined ? (['es', 'en'].includes(idioma) ? idioma : 'es') : (u.idioma || 'es'),
+    tema !== undefined ? (TEMAS.includes(tema) ? tema : 'oscuro') : (u.tema || 'oscuro'),
     u.id
   );
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)));

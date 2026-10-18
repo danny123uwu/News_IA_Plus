@@ -1,6 +1,12 @@
-const AUTH = 'http://localhost:3001';
-const FEEDS = 'http://localhost:3002';
-const AGENT = 'http://localhost:3003';
+// Direcciones de los microservicios.
+//  - Con Docker + Nginx el frontend sale por el puerto 80 y usa rutas del proxy
+//      /auth, /feeds, /agente  (Nginx las reparte a cada servicio).
+//  - Con "npm start" (sin Docker) la página sale por el 8090 y habla directo
+//      a los puertos 3001/3002/3003.
+const VIA_PROXY = location.port !== '8090';
+const AUTH = VIA_PROXY ? '/auth' : 'http://localhost:3001';
+const FEEDS = VIA_PROXY ? '/feeds' : 'http://localhost:3002';
+const AGENT = VIA_PROXY ? '/agente' : 'http://localhost:3003';
 
 let token = localStorage.getItem('token') || '';
 let yo = null;
@@ -9,6 +15,57 @@ let modoRegistro = false;
 let filtroFuente = null; // {id, nombre} — portada de una fuente
 
 const $ = (id) => document.getElementById(id);
+
+// ---------- TEMA DE COLOR ----------
+// El tema se aplica con <body data-tema="..."> y se guarda en tu cuenta (y en
+// localStorage para que se vea al instante, incluso antes de iniciar sesión).
+const TEMAS = [
+  { id: 'oscuro',  nombre: 'Oscuro',  puntos: ['#0f1419', '#16202a', '#1d9bf0'] },
+  { id: 'claro',   nombre: 'Claro',   puntos: ['#ffffff', '#eef2f7', '#1d9bf0'] },
+  { id: 'cian',    nombre: 'Cian',    puntos: ['#0f1419', '#16202a', '#06b6d4'] },
+  { id: 'purpura', nombre: 'Púrpura', puntos: ['#0f1419', '#16202a', '#a855f7'] },
+  { id: 'celeste', nombre: 'Celeste', puntos: ['#0f1419', '#16202a', '#38bdf8'] },
+  { id: 'rojo',    nombre: 'Rojo',    puntos: ['#0f1419', '#16202a', '#ef4444'] },
+  { id: 'verde',   nombre: 'Verde',   puntos: ['#0f1419', '#16202a', '#22c55e'] },
+  { id: 'naranja', nombre: 'Naranja', puntos: ['#0f1419', '#16202a', '#f97316'] },
+];
+let temaActual = localStorage.getItem('tema') || 'oscuro';
+if (!TEMAS.some((t) => t.id === temaActual)) temaActual = 'oscuro';
+document.body.dataset.tema = temaActual;
+
+function pintarTemas() {
+  const sel = $('temaTop');
+  if (sel) {
+    if (!sel.options.length) sel.innerHTML = TEMAS.map((t) => '<option value="' + t.id + '">' + esc(t.nombre) + '</option>').join('');
+    sel.value = temaActual;
+  }
+  const caja = $('temaCaja');
+  if (!caja) return;
+  caja.innerHTML = TEMAS.map((t) =>
+    '<button type="button" class="swatch' + (t.id === temaActual ? ' activo' : '') + '" data-tema="' + t.id + '">' +
+      '<span class="puntos">' + t.puntos.map((c) => '<i style="background:' + c + '"></i>').join('') + '</span>' +
+      '<span>' + esc(t.nombre) + '</span>' +
+      '<span class="tick">' + (t.id === temaActual ? '✓ activo' : '') + '</span>' +
+    '</button>').join('');
+  caja.querySelectorAll('.swatch').forEach((b) => b.addEventListener('click', () => {
+    aplicarTema(b.dataset.tema, true);
+    const n = (TEMAS.find((x) => x.id === b.dataset.tema) || {}).nombre || '';
+    toast('Tema ' + n + ' aplicado 🎨');
+  }));
+}
+
+function aplicarTema(tema, guardar) {
+  const t = TEMAS.some((x) => x.id === tema) ? tema : 'oscuro';
+  temaActual = t;
+  document.body.dataset.tema = t;
+  localStorage.setItem('tema', t);
+  pintarTemas();
+  if (guardar && yo) {
+    api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ tema: t }) })
+      .then((u) => { yo = u; if ($('temaMsg')) $('temaMsg').textContent = 'Tema guardado en tu cuenta ✓'; })
+      .catch((e) => { if ($('temaMsg')) $('temaMsg').textContent = '⚠️ No se pudo guardar: ' + e.message; });
+  }
+}
 
 function tagsDe(a) {
   if (Array.isArray(a.etiquetas)) return a.etiquetas;
@@ -40,6 +97,34 @@ async function api(base, path, options = {}) {
 
 function esc(s) {
   return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Convierte el texto que devuelve la IA (con **negritas**, viñetas "- ", títulos #)
+// en HTML prolijo. Antes se veían los asteriscos literales.
+function mdAHtml(t) {
+  const enLinea = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(>])\*(?!\s)([^*]+?)\*/g, '$1<em>$2</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  const out = [];
+  let enLista = false;
+  for (const linea of String(t || '').split(/\r?\n/)) {
+    const l = linea.replace(/\s+$/, '');
+    const li = l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if (li) {
+      if (!enLista) { out.push('<ul>'); enLista = true; }
+      out.push('<li>' + enLinea(li[1].replace(/^[-*•]\s+/, '')) + '</li>');
+      continue;
+    }
+    if (enLista) { out.push('</ul>'); enLista = false; }
+    if (!l.trim()) { out.push('<br />'); continue; }
+    const h = l.match(/^\s*#{1,6}\s+(.*)$/);
+    if (h) out.push('<p class="md-titulo">' + enLinea(h[1]) + '</p>');
+    else out.push('<p>' + enLinea(l) + '</p>');
+  }
+  if (enLista) out.push('</ul>');
+  return out.join('');
 }
 
 // ---------- LOGIN ----------
@@ -80,6 +165,15 @@ function salir() {
 }
 $('btnSalir').addEventListener('click', salir);
 
+// Clic en tu nombre/foto → te lleva a tu perfil
+$('btnPerfilTop').addEventListener('click', () => {
+  const t = document.querySelector('[data-vista="perfil"]');
+  if (t) t.click();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+$('temaTop').addEventListener('change', () => aplicarTema($('temaTop').value, true));
+pintarTemas();
+
 // ---------- ENTRAR ----------
 async function entrar(datos) {
   try {
@@ -93,6 +187,9 @@ async function entrar(datos) {
       $('fotoPerfil').src = AUTH + '/uploads/' + yo.foto;
     }
     $('perfilNombre').value = yo.nombre;
+    $('perfilIdioma').value = yo.idioma || 'es';
+    aplicarTema(yo.tema || temaActual, false); // el tema de tu cuenta manda
+    pintarTemas();
     await Promise.all([cargarFuentes(), cargarTaxonomia(), cargarFeed(), cargarPanel()]);
     cargarIA().catch(() => {});
   } catch (err) {
@@ -119,7 +216,7 @@ function pintarBurbujas() {
   const caja = $('burbujas');
   caja.innerHTML = '';
   if (!fuentes.length) {
-    caja.innerHTML = '<small style="color:#8b98a5">Agrega tus portales favoritos en "Mis fuentes"</small>';
+    caja.innerHTML = '<small style="color:var(--muted)">Agrega tus portales favoritos en "Mis fuentes"</small>';
     return;
   }
   fuentes.forEach((f) => {
@@ -232,8 +329,7 @@ async function agregarFuente(nombre, url, btn) {
     await cargarFuentes();
     await cargarFeed();
   } catch (err) {
-    msg.className = 'msg';
-    msg.style.color = '#f4212e';
+    msg.className = 'msg err';
     msg.textContent = err.message;
     if (btn) {
       btn.textContent = '❌ ' + err.message.slice(0, 42);
@@ -317,7 +413,20 @@ function pintarInfo(d) {
       : `<span class="aviso">0 por tus intereses</span>`);
   }
   if (d.relleno) partes.push('relleno con noticias anteriores');
-  caja.innerHTML = '📊 ' + partes.join(' · ');
+  let html = '📊 ' + partes.join(' · ');
+  // Búsqueda fijada: queda visible aunque la barra se haya vaciado.
+  if (busquedaAplicada) {
+    html += ' <span class="busqueda-chip">🔎 ' + esc(busquedaAplicada) +
+      '<button id="btnQuitarBusqueda" type="button" title="Quitar la búsqueda">✖</button></span>';
+  }
+  caja.innerHTML = html;
+  const quitar = $('btnQuitarBusqueda');
+  if (quitar) quitar.addEventListener('click', () => {
+    busquedaAplicada = '';
+    $('buscar').value = '';
+    actualizarLimpiar();
+    cargarFeed();
+  });
 }
 
 async function cargarFeed() {
@@ -347,7 +456,7 @@ async function cargarFeed() {
     }
     const intereses = (yo && yo.intereses ? yo.intereses : []).join(',');
     const horas = $('filtroHoras').value;
-    const q = $('buscar').value.trim();
+    const q = $('buscar').value.trim() || busquedaAplicada;
     const d = await api(FEEDS, `/feed?horas=${horas}&intereses=${encodeURIComponent(intereses)}&q=${encodeURIComponent(q)}`);
     pintarInfo(d);
     if (!d.articulos.length) {
@@ -359,14 +468,19 @@ async function cargarFeed() {
   } catch (err) { caja.innerHTML = '<p class="vacio">' + esc(err.message) + '</p>'; }
 }
 
+// Idioma preferido del usuario ('es' por defecto). En español se usa la
+// traducción automática (titulo_es/resumen_es); en inglés, el texto original.
+function miIdioma() { return (yo && yo.idioma) || 'es'; }
+function tituloDe(a) { return miIdioma() === 'en' ? a.titulo : (a.titulo_es || a.titulo); }
+
 function cardNoticia(a, destacada) {
   const div = document.createElement('div');
   div.className = 'card-noticia' + (destacada ? ' destacada' : '');
   div.dataset.id = a.id;
   const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '';
   const tags = tagsDe(a);
-  const titulo = a.titulo_es || a.titulo;
-  const extracto = a.resumen_es || a.contenido;
+  const titulo = tituloDe(a);
+  const extracto = miIdioma() === 'en' ? (a.contenido || '') : (a.resumen_es || a.contenido);
   const traducido = a.titulo_es && a.titulo_es !== a.titulo;
   div.innerHTML = `
     ${a.imagen ? `<div class="media"><img src="${esc(a.imagen)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.style.display='none'">${a.video ? '<span class="play">▶ video</span>' : ''}</div>` : ''}
@@ -384,10 +498,10 @@ function cardNoticia(a, destacada) {
     <div class="extracto">${esc(extracto)}</div>
     <div class="etiquetas">${tags.map((t) => `<span class="etiqueta">#${esc(t)}</span>`).join('')}</div>
     <div class="acciones">
-      <button data-a="abrir">📖 Leer</button>
-      <button data-a="fav" class="${a.favorito ? 'on' : ''}">${a.favorito ? '★ Guardado' : '☆ Favorito'}</button>
-      <button data-a="archivar">📁 Archivar</button>
-      <button data-a="saltar">✖ No me interesa</button>
+      <button data-a="abrir"><span class="ico">📖</span> Leer</button>
+      <button data-a="fav" class="${a.favorito ? 'on' : ''}"><span class="ico">${a.favorito ? '★' : '☆'}</span> ${a.favorito ? 'Guardado' : 'Favorito'}</button>
+      <button data-a="archivar"><span class="ico">📁</span> Archivar</button>
+      <button data-a="saltar"><span class="ico">✖</span> No me interesa</button>
       <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver fuente ↗</a>
     </div>`;
   div.addEventListener('click', (e) => {
@@ -432,17 +546,69 @@ async function cambiarPrioridad(a, delta) {
 }
 
 let tBuscar;
-$('buscar').addEventListener('input', () => { clearTimeout(tBuscar); tBuscar = setTimeout(() => cargarFeed(), 300); });
+let busquedaAplicada = '';
+function actualizarLimpiar() {
+  const b = $('btnLimpiarBusqueda');
+  if (b) b.classList.toggle('oculto', !$('buscar').value);
+}
+$('buscar').addEventListener('input', () => {
+  actualizarLimpiar();
+  clearTimeout(tBuscar);
+  // Al escribir, la búsqueda vuelve a ser "en vivo" y se descarta la fijada.
+  tBuscar = setTimeout(() => { busquedaAplicada = ''; cargarFeed(); }, 300);
+});
+// Enter: fija la búsqueda, VACÍA la barra (para que no siga interrumpiendo) y
+// deja un chip para quitarla.
+$('buscar').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = $('buscar').value.trim();
+    if (!v) return;
+    busquedaAplicada = v;
+    $('buscar').value = '';
+    actualizarLimpiar();
+    cargarFeed();
+  }
+  if (e.key === 'Escape') {
+    $('buscar').value = '';
+    busquedaAplicada = '';
+    actualizarLimpiar();
+    cargarFeed();
+  }
+});
+$('btnLimpiarBusqueda').addEventListener('click', () => {
+  $('buscar').value = '';
+  busquedaAplicada = '';
+  actualizarLimpiar();
+  $('buscar').focus();
+  cargarFeed();
+});
 $('filtroHoras').addEventListener('change', () => cargarFeed());
 
 // ---------- MODAL ----------
 function sanearHTML(html) {
   const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
-  doc.querySelectorAll('script,style,iframe,object,embed,link,meta,noscript,form,input,button').forEach((n) => n.remove());
+  // Fuera todo lo que no es contenido (scripts, estilos, formularios, anuncios…)
+  doc.querySelectorAll('script,style,object,embed,link,meta,noscript,form,input,button,svg,canvas').forEach((n) => n.remove());
+
+  // Videos incrustados: solo se permiten YouTube y Vimeo.
+  doc.querySelectorAll('iframe').forEach((ifr) => {
+    const src = String(ifr.getAttribute('src') || '');
+    if (!/^https?:\/\/(?:www\.)?(?:youtube(?:-nocookie)?\.com|youtu\.be|player\.vimeo\.com)\//i.test(src)) { ifr.remove(); return; }
+    [...ifr.attributes].forEach((attr) => {
+      if (!['src', 'title'].includes(attr.name.toLowerCase())) ifr.removeAttribute(attr.name);
+    });
+    ifr.setAttribute('class', 'video-inline');
+    ifr.setAttribute('allowfullscreen', '');
+    ifr.setAttribute('loading', 'lazy');
+    ifr.setAttribute('referrerpolicy', 'no-referrer');
+  });
+
   doc.querySelectorAll('*').forEach((el) => {
     [...el.attributes].forEach((attr) => {
       const n = attr.name.toLowerCase();
       const v = String(attr.value || '');
+      if (el.tagName === 'IFRAME') return; // ya saneado arriba
       if (el.tagName === 'IMG') {
         if (n === 'src' && !/^https?:\/\//i.test(v)) el.remove();
         else if (n !== 'src' && n !== 'alt') el.removeAttribute(attr.name);
@@ -459,35 +625,49 @@ function sanearHTML(html) {
   return doc.body.innerHTML;
 }
 
+// Control de "quién es el dueño" de las respuestas asíncronas del modal: si abrís
+// otra noticia (o cerrás y reabrís) mientras una traducción o una respuesta de la IA
+// está en camino, esa respuesta vieja se descarta. Antes se mezclaba el contenido.
+let modalArticuloId = null;
+let modalSeq = 0;
+let iaSeq = 0;
+
 function abrirArticulo(a) {
   const tags = tagsDe(a);
-  const titulo = a.titulo_es || a.titulo;
-  const resumen = a.resumen_es || String(a.contenido || '').slice(0, 400);
+  const titulo = tituloDe(a);
   const traducido = a.titulo_es && a.titulo_es !== a.titulo;
   document.body.classList.add('modal-abierto');
   $('modalCuerpo').innerHTML = `
-    ${a.imagen ? `<div class="media modal-media"><img src="${esc(a.imagen)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.style.display='none'"></div>` : ''}
-    ${a.video ? `<div class="video-marco"><iframe src="${esc(a.video)}" title="video" frameborder="0" allowfullscreen loading="lazy"></iframe></div>` : ''}
     <span class="pastilla ${a.prioridad >= 4 ? 'prio' : ''}">📡 ${esc(a.fuente)}</span>
     <h2>${esc(titulo)}</h2>
     ${traducido ? `<div class="titulo-original">Título original: ${esc(a.titulo)}</div>` : ''}
     <div class="meta">${esc(a.autor || 'Sin autor')} · ${a.fecha ? new Date(a.fecha).toLocaleString('es-MX') : ''} · ${tags.map((t) => '#' + esc(t)).join(' ')}</div>
-    <div class="cuerpo" id="cuerpoArt">${esc(resumen)}</div>
-    <div class="cuerpo-original" id="cuerpoOriginal"><p class="cargando-original">⏳ Cargando contenido completo con imágenes…</p></div>
+    <div class="cuerpo-original" id="cuerpoArt"><p class="cargando-original">Cargando la noticia…</p></div>
     <div id="resultadoIA"></div>
-    <div class="acciones">
-      <button id="mResumir">🤖 Resumir con IA</button>
-      <button id="mPreguntar">💬 Preguntarle a la IA</button>
-      ${traducido ? '<button id="mTraducir">🌐 Traducir contenido completo</button>' : ''}
-      <button id="mRecorte">✂️ Guardar recorte</button>
-      <button id="mLeido">✓ Marcar leído</button>
-      <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver fuente ↗</a>
+    <div class="acciones-barra" id="accionesBarra">
+      <button class="acciones-toggle" id="btnToggleAcciones" type="button" title="Ocultar o mostrar los botones">⌄ Ocultar acciones</button>
+      <div class="acciones">
+        <button id="mResumir">🤖 Resumir con IA</button>
+        <button id="mPreguntar">💬 Preguntarle a la IA</button>
+        ${traducido ? '<button id="mTraducir">🌐 Traducir contenido completo</button>' : ''}
+        <button id="mRecorte">✂️ Guardar recorte</button>
+        <button id="mLeido">✓ Marcar leído</button>
+        <a href="${esc(a.link)}" target="_blank" rel="noopener">Ver fuente ↗</a>
+      </div>
     </div>`;
   $('modal').classList.remove('oculto');
+  modalArticuloId = a.id;
+  const miModal = ++modalSeq;
   api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ leido: true }) })
     .then(() => { a.leido = 1; marcarCardLeida(a.id); })
     .catch(() => {});
-  cargarOriginalEnModal(a);
+  cargarCuerpoEnModal(a);
+
+  $('btnToggleAcciones').addEventListener('click', () => {
+    const barra = $('accionesBarra');
+    barra.classList.toggle('plegada');
+    $('btnToggleAcciones').textContent = barra.classList.contains('plegada') ? '⌃ Acciones' : '⌄ Ocultar acciones';
+  });
 
   const btnTrad = $('mTraducir');
   if (btnTrad) btnTrad.addEventListener('click', async () => {
@@ -495,29 +675,38 @@ function abrirArticulo(a) {
     btnTrad.textContent = '🌐 Traduciendo…';
     try {
       const d = await api(AGENT, '/spanish', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a.contenido, modo: 'completo' }) });
-      $('cuerpoArt').textContent = d.texto || d.resumen || a.contenido;
+      // Traduce el texto pero conserva las imágenes y videos (los reubicamos al final).
+      const medios = [...$('cuerpoArt').querySelectorAll('figure.media-inline, .video-marco')].map((n) => n.outerHTML);
+      $('cuerpoArt').innerHTML = String(d.texto || d.resumen || a.contenido)
+        .split(/\n{2,}/).map((p) => '<p>' + esc(p) + '</p>').join('') + medios.join('');
       toast('Contenido traducido ✓ (' + (d.proveedor || '') + ')');
     } catch (e) { toast(e.message); }
     btnTrad.disabled = false;
     btnTrad.textContent = '🌐 Traducir contenido completo';
   });
 
+  const iaVigente = (mi) => mi === iaSeq && miModal === modalSeq;
+
   $('mResumir').addEventListener('click', async () => {
+    const mi = ++iaSeq;
     $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 Generando con el motor configurado…</div>';
     try {
-      const d = await api(AGENT, '/summarize', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a.contenido }) });
-      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 Resumen (' + esc(d.motor) + '):\n\n' + esc(d.resumen) + '</div>';
-    } catch (e) { $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
+      const d = await api(AGENT, '/summarize', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a._textoIA || a.contenido }) });
+      if (!iaVigente(mi)) return;
+      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 Resumen <span class="ia-motor-tag">' + esc(d.motor) + '</span>' + mdAHtml(d.resumen) + '</div>';
+    } catch (e) { if (iaVigente(mi)) $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
   });
 
   $('mPreguntar').addEventListener('click', async () => {
     const p = prompt('¿Qué quieres saber de esta noticia?');
     if (!p) return;
+    const mi = ++iaSeq;
     $('resultadoIA').innerHTML = '<div class="resultado-ia">Pensando… 🤖</div>';
     try {
-      const d = await api(AGENT, '/ask', { method: 'POST', body: JSON.stringify({ pregunta: p, titulo: a.titulo, texto: a.contenido }) });
-      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 ' + esc(d.respuesta) + '</div>';
-    } catch (e) { $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
+      const d = await api(AGENT, '/ask', { method: 'POST', body: JSON.stringify({ pregunta: p, titulo: a.titulo, texto: a._textoIA || a.contenido }) });
+      if (!iaVigente(mi)) return;
+      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 ' + mdAHtml(d.respuesta) + '</div>';
+    } catch (e) { if (iaVigente(mi)) $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
   });
 
   $('mRecorte').addEventListener('click', async () => {
@@ -554,31 +743,97 @@ function marcarCardLeida(id) {
   }
 }
 
-function cargarOriginalEnModal(a) {
-  const c = $('cuerpoOriginal');
+// Arma el cuerpo de la noticia: el texto TAL COMO LO TRAE EL RSS, con su
+// multimedia (imágenes, YouTube, Vimeo) en el mismo orden del artículo.
+function bloqueImagen(src) {
+  return '<figure class="media-inline"><img src="' + esc(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest(\'figure\').style.display=\'none\'"></figure>';
+}
+function bloqueVideo(src) {
+  if (!/^https?:\/\//i.test(src)) return '';
+  return '<div class="video-marco"><iframe src="' + esc(src) + '" title="video" frameborder="0" allowfullscreen loading="lazy" referrerpolicy="no-referrer"></iframe></div>';
+}
+
+function cuerpoNoticia(a) {
+  // 1) Si el RSS trae el HTML de la noticia (con imágenes/videos en orden), se usa tal cual.
+  if (a.contenido_html && /<[a-z][\s\S]*>/i.test(String(a.contenido_html))) {
+    let html = sanearHTML(a.contenido_html);
+    if (a.imagen && !/<img/i.test(html)) html = bloqueImagen(a.imagen) + html;
+    if (a.video && !/<iframe/i.test(html)) html += bloqueVideo(a.video);
+    return html;
+  }
+  // 2) Si el RSS solo trae texto: párrafos + la imagen/video del feed intercalados.
+  const partes = String(a.contenido || '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (!partes.length) return '<p>Sin contenido disponible.</p>';
+  const salida = [];
+  partes.forEach((p, i) => {
+    salida.push('<p>' + esc(p) + '</p>');
+    if (i === 0 && a.imagen) salida.push(bloqueImagen(a.imagen));
+    if (i === 1 && a.video) salida.push(bloqueVideo(a.video));
+  });
+  if (partes.length === 1 && a.video) salida.push(bloqueVideo(a.video));
+  return salida.join('');
+}
+
+// ¿El texto ya está en español? (heurística simple de palabras comunes)
+function pareceEspanol(t) {
+  const s = String(t || '');
+  if (/[ñáéíóúü¿¡]/i.test(s)) return true;
+  const palabras = (s.toLowerCase().match(/\b[a-záéíóúüñ]+\b/g) || []).length;
+  if (palabras < 4) return true; // frases muy cortas: no vale la pena traducir
+  const comunes = (s.toLowerCase().match(/\b(el|la|los|las|de|del|que|y|en|un|una|para|con|por|se|su|sus|no|es|al|más|como|desde|sobre|entre|este|esta|muy|pero|hay|son|fue|han|cuando|también|contra|sin|ante|bajo)\b/g) || []).length;
+  return comunes / palabras > 0.1;
+}
+
+// Traduce los párrafos del cuerpo al español CONSERVANDO imágenes y videos.
+async function traducirCuerpo(caja, a) {
+  if (miIdioma() !== 'es') return;
+  const bloques = [...caja.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, figcaption, blockquote, dd, dt')]
+    .filter((el) => el.textContent.trim() && !pareceEspanol(el.textContent));
+  if (!bloques.length) return;
+  const seq = modalSeq;
+  try {
+    const d = await api(AGENT, '/spanish/bloques', { method: 'POST', body: JSON.stringify({ textos: bloques.map((el) => el.textContent.trim()) }) });
+    // Si mientras traducía se abrió otra noticia, esta respuesta ya no corresponde.
+    if (seq !== modalSeq || !caja.isConnected) return;
+    const tr = d.traducciones || [];
+    bloques.forEach((el, i) => { if (tr[i] && tr[i].trim()) el.textContent = tr[i]; });
+  } catch {}
+}
+
+function cargarCuerpoEnModal(a) {
+  const c = $('cuerpoArt');
   if (!c) return;
-  c.classList.remove('oculto');
-  c.innerHTML = '<p class="cargando-original">⏳ Cargando contenido completo con imágenes…</p>';
-  const prom = (a.contenido_html === undefined || a.contenido_html === null)
-    ? api(FEEDS, '/articles/' + a.id).then((d) => {
+  const miModal = modalSeq;
+  const pintar = async () => {
+    if (miModal !== modalSeq) return;
+    if ($('modal').classList.contains('oculto')) return;
+    if (a._cuerpoHtml) { c.innerHTML = a._cuerpoHtml; return; } // ya se armó/tradujo antes
+    c.innerHTML = cuerpoNoticia(a);
+    a._textoIA = (c.innerText || '').slice(0, 6000); // texto original para la IA
+    await traducirCuerpo(c, a);                       // si el idioma es español
+    if (miModal !== modalSeq) return;
+    a._cuerpoHtml = c.innerHTML;
+  };
+  // El HTML del artículo se pide solo al abrir (no viaja en el feed para no pesar).
+  if (a.contenido_html === undefined) {
+    api(FEEDS, '/articles/' + a.id)
+      .then((d) => {
+        if (miModal !== modalSeq) return;
         a.contenido_html = d.articulo.contenido_html;
         if (d.articulo.contenido) a.contenido = d.articulo.contenido;
+        pintar();
       })
-    : Promise.resolve();
-  prom.then(() => {
-    if ($('modal').classList.contains('oculto')) return;
-    c.innerHTML = a.contenido_html
-      ? sanearHTML(a.contenido_html)
-      : '<p>' + esc(a.contenido || 'Sin contenido original disponible.') + '</p>';
-  }).catch((e) => {
-    if ($('modal').classList.contains('oculto')) return;
-    c.innerHTML = '<p>❌ ' + esc(e.message) + '</p>';
-  });
+      .catch(pintar);
+  } else {
+    pintar();
+  }
 }
 
 function cerrarModal() {
   $('modal').classList.add('oculto');
   document.body.classList.remove('modal-abierto');
+  modalArticuloId = null;
+  modalSeq++; // invalida cualquier respuesta que venga en camino
 }
 $('modalCerrar').addEventListener('click', cerrarModal);
 $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
@@ -592,7 +847,7 @@ $('btnDigest').addEventListener('click', async () => {
   try {
     const d = await api(FEEDS, '/feed?horas=24&intereses=' + encodeURIComponent((yo.intereses || []).join(',')));
     const dg = await api(AGENT, '/digest', { method: 'POST', body: JSON.stringify({ articulos: d.articulos }) });
-    caja.textContent = dg.digest;
+    caja.innerHTML = mdAHtml(dg.digest);
   } catch (e) { caja.textContent = '❌ ' + e.message; }
 });
 
@@ -664,10 +919,24 @@ async function cargarTaxonomia() {
 
 $('btnGuardarPerfil').addEventListener('click', async () => {
   try {
-    await api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ nombre: $('perfilNombre').value }) });
-    yo.nombre = $('perfilNombre').value;
+    const u = await api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ nombre: $('perfilNombre').value, idioma: $('perfilIdioma').value }) });
+    yo.nombre = u.nombre;
+    yo.idioma = u.idioma;
     $('nombreTop').textContent = yo.nombre;
     toast('Perfil guardado ✓');
+    cargarFeed();
+  } catch (e) { toast(e.message); }
+});
+
+$('perfilIdioma').addEventListener('change', async () => {
+  try {
+    const u = await api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ idioma: $('perfilIdioma').value }) });
+    yo.idioma = u.idioma;
+    $('idiomaMsg').textContent = u.idioma === 'es'
+      ? 'Listo: las noticias se mostrarán en español.'
+      : 'Listo: verás las noticias en su idioma original.';
+    toast('Idioma actualizado ✓');
+    cargarFeed();
   } catch (e) { toast(e.message); }
 });
 
@@ -737,16 +1006,20 @@ function pintarIA() {
     'Motor actual: <b>' + esc(config.motor === 'api' ? 'API externa' : ollama ? 'Ollama local' : 'sin Ollama') + '</b>' +
     ' · Clasificar: <b>' + esc(clas) + '</b>' +
     ' · Resumir: <b>' + esc(resu) + '</b>' +
-    (config.motor === 'api' && config.api.keyGuardada ? ' · key: <b>' + esc(config.api.keyFinal) + '</b>' : '');
+    (config.motor === 'api' && config.api.keyGuardada ? ' · key: <b>' + esc(config.api.keyFinal) + '</b>' : '') +
+    (config.motor === 'api' ? (config.respaldoLocal ? ' · respaldo local: <b>sí</b>' : ' · <b>IA local apagada</b>') : '');
 
   document.querySelectorAll('input[name=motorIA]').forEach((r) => { r.checked = r.value === config.motor; });
   $('iaApiCaja').classList.toggle('oculto', config.motor !== 'api');
+  if ($('iaRespaldoLocal')) $('iaRespaldoLocal').checked = config.respaldoLocal === true;
 
   $('iaProveedor').innerHTML = Object.keys(proveedores)
     .map((k) => '<option value="' + esc(k) + '">' + esc(proveedores[k].nombre) + '</option>').join('');
   $('iaProveedor').value = config.api.proveedor || 'gemini';
   $('iaBaseUrl').value = config.api.baseUrl || '';
   $('iaModelo').value = config.api.modelo || '';
+  $('iaModeloLista').innerHTML = '<option value="">— elegí un modelo —</option>';
+  $('iaModeloLista').classList.add('oculto');
   $('iaKey').value = '';
   $('iaKey').placeholder = config.api.keyGuardada
     ? 'Key guardada: ' + config.api.keyFinal + ' (vacío = no cambiar)'
@@ -774,11 +1047,56 @@ function pintarIA() {
 
   document.querySelectorAll('input[name=tradMotor]').forEach((r) => { r.checked = r.value === config.traduccion; });
   $('iaTradMsg').textContent = config.traduccion === 'google'
-    ? 'Google primero (gratis, 0.16 s). Si falla, respaldo automático con tu motor.'
-    : 'Tu motor primero. Si falla, respaldo con Google y MyMemory: nunca queda sin traducir.';
+    ? 'Google primero (gratis y rápido). Si falla, tu motor de IA como respaldo.'
+    : 'Tu motor de IA primero. Si falla, Google y MyMemory de respaldo.';
 
   $('motorTop').textContent = etiquetaMotor(config);
   $('motorTop').title = 'Motor de IA: ' + etiquetaMotor(config) + ' — clic para configurar';
+
+  pintarDescargas();
+}
+
+// Lista de modelos recomendados con botón para descargarlos (para quien no tiene ninguno).
+function pintarDescargas() {
+  const recs = (iaData && iaData.recomendados) || [];
+  const caja = $('iaDescargas');
+  if (!recs.length) { caja.classList.add('oculto'); return; }
+  const instalados = new Set(((iaData && iaData.modelos) || []).map((m) => m.name));
+  const hayAlguno = ((iaData && iaData.modelos) || []).length > 0;
+  caja.classList.remove('oculto');
+  caja.innerHTML =
+    '<h4 class="ia-sub">⬇️ Modelos recomendados</h4>' +
+    '<p class="msg">' + (hayAlguno
+      ? 'Estos son los que mejor rinden en equipos humildes (~2 GB de VRAM).'
+      : '<b>No tenés ningún modelo instalado.</b> Bajá <b>llama3.2:3b</b> para empezar (anda en PCs de ~2 GB de VRAM).') + '</p>' +
+    recs.map((r) => {
+      const listo = instalados.has(r.name);
+      return '<div class="ia-rec">' +
+        '<div class="ia-rec-info"><b>' + esc(r.name) + '</b> <small>(' + r.gb + ' GB · ' + (r.tarea === 'clasificar' ? 'clasificar' : 'texto') + ')</small><br />' +
+        '<small>' + esc(r.nota) + '</small></div>' +
+        (listo
+          ? '<span class="ia-listo">✅ instalado</span>'
+          : '<button class="btn-secundario btn-descargar" data-modelo="' + esc(r.name) + '" type="button">⬇️ Descargar</button>') +
+        '</div>';
+    }).join('');
+  caja.querySelectorAll('.btn-descargar').forEach((b) => b.addEventListener('click', () => descargarModelo(b)));
+}
+
+async function descargarModelo(btn) {
+  const name = btn.dataset.modelo;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Descargando…';
+  toast('Descargando ' + name + '. Puede tardar varios minutos.');
+  try {
+    await api(AGENT, '/model/pull', { method: 'POST', body: JSON.stringify({ name }) });
+    toast('✅ ' + name + ' instalado');
+    await cargarIA();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = orig;
+    toast('❌ ' + e.message);
+  }
 }
 
 function aplicarProveedor(sobrescribir) {
@@ -793,6 +1111,7 @@ function cuerpoConfigIA() {
     motor: (document.querySelector('input[name=motorIA]:checked') || {}).value || 'local',
     modelos: { clasificar: $('iaClasificar').value, resumir: $('iaResumir').value },
     traduccion: (document.querySelector('input[name=tradMotor]:checked') || {}).value || 'google',
+    respaldoLocal: Boolean($('iaRespaldoLocal') && $('iaRespaldoLocal').checked),
     api: { proveedor: $('iaProveedor').value, baseUrl: $('iaBaseUrl').value, modelo: $('iaModelo').value, key: $('iaKey').value }
   };
 }
@@ -801,7 +1120,7 @@ document.querySelectorAll('input[name=motorIA]').forEach((r) => r.addEventListen
   $('iaApiCaja').classList.toggle('oculto', r.value !== 'api');
   if (r.value === 'api' && !$('iaBaseUrl').value) aplicarProveedor(true);
 }));
-$('iaProveedor').addEventListener('change', () => aplicarProveedor(true));
+$('iaProveedor').addEventListener('change', () => { aplicarProveedor(true); if ($('iaModeloLista')) { $('iaModeloLista').innerHTML = '<option value="">— elegí un modelo —</option>'; $('iaModeloLista').classList.add('oculto'); } });
 
 $('btnGuardarIA').addEventListener('click', async () => {
   try {
@@ -819,6 +1138,24 @@ $('btnProbarApi').addEventListener('click', async () => {
     const d = await api(AGENT, '/config/test', { method: 'POST', body: JSON.stringify(cuerpo) });
     $('iaApiMsg').innerHTML = '✅ <b>' + esc(d.motor) + '</b> — ' + d.ms + ' ms — "' + esc(d.respuesta) + '"';
   } catch (e) { $('iaApiMsg').textContent = '❌ ' + e.message; }
+});
+
+$('btnVerModelos').addEventListener('click', async () => {
+  $('iaApiMsg').textContent = '⏳ Consultando los modelos de tu API…';
+  try {
+    const d = await api(AGENT, '/config/models', { method: 'POST', body: JSON.stringify(cuerpoConfigIA().api) });
+    const sel = $('iaModeloLista');
+    sel.innerHTML = '<option value="">— elegí un modelo (' + d.modelos.length + ') —</option>' +
+      d.modelos.map((m) => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('');
+    sel.classList.remove('oculto');
+    sel.value = $('iaModelo').value || '';
+    if (!d.modelos.length) { $('iaApiMsg').textContent = '⚠️ Tu API no devolvió ningún modelo.'; return; }
+    $('iaApiMsg').innerHTML = '✅ ' + d.modelos.length + ' modelos disponibles. Elegí uno en la lista de arriba y después probá la conexión.';
+  } catch (e) { $('iaApiMsg').textContent = '❌ ' + e.message; }
+});
+
+$('iaModeloLista').addEventListener('change', () => {
+  if ($('iaModeloLista').value) $('iaModelo').value = $('iaModeloLista').value;
 });
 
 $('btnProbarIA').addEventListener('click', async () => {

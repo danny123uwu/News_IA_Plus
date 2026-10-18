@@ -83,17 +83,29 @@ for (const c of COLS_ART) {
   if (!columnas('articles').includes(c)) db.exec(`ALTER TABLE articles ADD COLUMN ${c} TEXT`);
 }
 
+// Migración 2: el cuerpo de la noticia ya NO se baja de la página original.
+// Solo se muestra el texto/multimedia que trae el propio RSS. Borramos una vez
+// el HTML viejo (era la página completa scrapeada) para partir de cero.
+if (((db.prepare('PRAGMA user_version').get() || {}).user_version || 0) < 2) {
+  db.exec('UPDATE articles SET contenido_html=NULL');
+  db.exec('PRAGMA user_version=2');
+  console.log('[feeds] contenido_html reiniciado: desde ahora solo se usa el del RSS');
+}
+
 function htmlATexto(html) {
   return String(html || '')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<\/(p|div|br|h[1-6]|li|tr)[^>]*>/gi, ' ')
+    .replace(/<\/(p|div|h[1-6]|li|tr)[^>]*>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&#8217;|&rsquo;/g, '’').replace(/&#8220;|&#8221;|&ldquo;|&rdquo;/g, '"')
     .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#\d+;/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -169,7 +181,7 @@ function etiquetar(titulo, texto) {
   return tags.length ? tags.slice(0, 4) : ['General'];
 }
 
-async function reclasificarConIA(items) {
+async function reclasificarConIA(items, userId) {
   if (!items.length) return;
   try {
     const r = await fetch(AGENT + '/classify-batch', {
@@ -178,7 +190,7 @@ async function reclasificarConIA(items) {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + jwt.sign({ id: 0, email: 'feeds@interno', rol: 'servicio' }, SECRET, { expiresIn: '12h' })
       },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, userId }),
       signal: AbortSignal.timeout(75000)
     });
     if (!r.ok) return;
@@ -219,7 +231,9 @@ async function importarFuente(src, feedYaParseado) {
       const args = [];
       if (!existe.imagen && imagen) { cambios.push('imagen=?'); args.push(imagen); }
       if (!existe.video && video) { cambios.push('video=?'); args.push(video); }
-      if (!existe.contenido_html && contenidoHtml) { cambios.push('contenido_html=?'); args.push(contenidoHtml); }
+      if (!existe.contenido_html || (contenidoHtml && contenidoHtml !== existe.contenido_html)) {
+        if (contenidoHtml) { cambios.push('contenido_html=?'); args.push(contenidoHtml); }
+      }
       if (contenido.length > String(existe.contenido || '').length) { cambios.push('contenido=?'); args.push(contenido); }
       if (cambios.length) db.prepare(`UPDATE articles SET ${cambios.join(',')} WHERE id=?`).run(...args, existe.id);
       continue;
@@ -237,33 +251,33 @@ async function importarFuente(src, feedYaParseado) {
       porTraducir.push(Number(r.lastInsertRowid));
     }
   }
-  if (pendientes.length) reclasificarConIA(pendientes).catch(() => {});
-  if (porTraducir.length) encolarTraduccion(porTraducir);
+  if (pendientes.length) reclasificarConIA(pendientes, src.user_id).catch(() => {});
+  if (porTraducir.length) encolarTraduccion(porTraducir, src.user_id);
   return nuevos;
 }
 
 // ---------- COLA DE TRADUCCIÓN AL ESPAÑOL ----------
 const tokenServicio = () => jwt.sign({ id: 0, email: 'feeds@interno', rol: 'servicio' }, SECRET, { expiresIn: '12h' });
-const colaES = new Set();
+const colaES = new Map();
 let traduciendo = false;
 
-function encolarTraduccion(ids) {
-  for (const id of ids) colaES.add(id);
+function encolarTraduccion(ids, userId) {
+  for (const id of ids) colaES.set(id, userId ?? null);
   if (!traduciendo) procesarColaES().catch(() => {});
 }
 
 async function procesarColaES() {
   traduciendo = true;
   while (colaES.size) {
-    const id = colaES.values().next().value;
+    const [id, userId] = colaES.entries().next().value;
     colaES.delete(id);
     try {
-      const a = db.prepare('SELECT id, titulo, contenido, titulo_es FROM articles WHERE id=?').get(id);
+      const a = db.prepare('SELECT id, user_id, titulo, contenido, titulo_es FROM articles WHERE id=?').get(id);
       if (!a || a.titulo_es) continue;
       const r = await fetch(AGENT + '/spanish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenServicio() },
-        body: JSON.stringify({ titulo: a.titulo, texto: String(a.contenido || '').slice(0, 900) }),
+        body: JSON.stringify({ titulo: a.titulo, texto: String(a.contenido || '').slice(0, 900), userId: userId ?? a.user_id }),
         signal: AbortSignal.timeout(45000)
       });
       if (!r.ok) continue;
@@ -376,111 +390,9 @@ app.get('/articles/:id', auth, async (req, res) => {
   const a = db.prepare(`SELECT a.*, s.nombre AS fuente, s.prioridad FROM articles a
     JOIN sources s ON s.id=a.source_id WHERE a.id=? AND a.user_id=?`).get(req.params.id, req.user.id);
   if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
-  // Si el RSS no trajo el HTML con imágenes (o es de antes del guardado), ir a por él a la web original
-  if (!a.contenido_html && a.link) {
-    const html = await enriquecerDesdeWeb(a.link);
-    if (html) {
-      db.prepare('UPDATE articles SET contenido_html=? WHERE id=?').run(html, a.id);
-      a.contenido_html = html;
-    }
-  }
   res.json({ articulo: a });
 });
 
-// Extrae un <div> cuya class coincida con el regex, respetando anidamiento de divs
-function extraerDivPorClase(html, claseRe) {
-  const m = html.match(new RegExp('<div[^>]+(?:class|id)=["\'][^"\']*' + claseRe + '[^"\']*["\'][^>]*>', 'i'));
-  if (!m) return null;
-  const inicio = m.index;
-  let depth = 0;
-  const re = /<div\b|<\/div>/gi;
-  re.lastIndex = inicio;
-  let mm;
-  while ((mm = re.exec(html))) {
-    if (mm[0].toLowerCase() === '<div') depth++;
-    else {
-      depth--;
-      if (depth === 0) return html.slice(inicio, mm.index + mm[0].length);
-    }
-  }
-  return html.slice(inicio, inicio + 30000);
-}
-
-async function enriquecerDesdeWeb(url) {
-  try {
-    if (!/^https?:\/\//i.test(url)) return null;
-    const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-    let html = null;
-    // 1) Directo
-    try {
-      const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }, redirect: 'follow', signal: AbortSignal.timeout(7000) });
-      if (r.ok) {
-        const t = await r.text();
-        if (!/just a moment|cf_chl|challenge-platform/i.test(t)) html = t;
-      }
-    } catch {}
-    // 2) AllOrigins (lee la página aunque Cloudflare bloquee)
-    if (!html) {
-      try {
-        const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
-        if (r.ok) {
-          const t = await r.text();
-          if (!/just a moment|cf_chl/i.test(t)) html = t;
-        }
-      } catch {}
-    }
-    // 3) Jina reader (devuelve markdown → lo convertimos a HTML)
-    if (!html) {
-      try {
-        const r = await fetch('https://r.jina.ai/' + url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
-        if (r.ok) {
-          const md = await r.text();
-          if (md && md.length > 400) {
-            html = md
-              .replace(/^Title:.*$/m, '').replace(/^URL Source:.*$/m, '').replace(/^Published Time:.*$/m, '').replace(/^Markdown Content:.*$/m, '')
-              .replace(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<img src="$2" alt="$1">')
-              .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>')
-              .split(/\n{2,}/).map((p) => '<p>' + p.trim().replace(/\n/g, '<br>') + '</p>').join('\n');
-          }
-        }
-      } catch {}
-    }
-    if (!html || !/<img|<video|<iframe/i.test(html)) return null;
-    let cuerpo = '';
-    // 1) El div del cuerpo del post (preciso, excluye widgets de Blogger/THN)
-    cuerpo = extraerDivPorClase(html, '(?:post-body|entry-content|article-content|story-body|node-content|main-content|article-body)') || '';
-    // 2) <article> solo si es grande
-    if (!cuerpo || cuerpo.length < 800) {
-      const art = html.match(/<article[\s\S]*?<\/article>/i);
-      if (art && art[0].length > 1500) cuerpo = art[0];
-    }
-    // 3) body completo de último recurso
-    if (!cuerpo || cuerpo.length < 800) {
-      const b = html.match(/<body[\s\S]*<\/body>/i);
-      cuerpo = b ? b[0] : html;
-    }
-    // Cortar en el primer widget de "fin de artículo" (relacionados, más leídos, recomendados…)
-    const finArt = cuerpo.search(/<(?:div|section|aside|ul)[^>]+(?:class|id)=["'][^"']*(?:below-post|related-post|related-stories|related-content|read-more|more-articles|recommended|expert-insight|popular-post|you-may|trending)/i);
-    if (finArt > 400) cuerpo = cuerpo.slice(0, finArt);
-    cuerpo = cuerpo.replace(/<(?:h2|h3|div|span)[^>]*>\s*(?:Related Posts?|You May Also|Recommended|SHARE THIS|Trending|Popular Posts?|Read More)[^<]{0,50}<\/(?:h2|h3|div|span)>[\s\S]*$/i, ' ');
-    // Quitar todo lo que NO es el cuerpo de la noticia: widgets, redes, anuncios, comentarios
-    cuerpo = cuerpo
-      .replace(/<(div|aside|section|ul|figure)[^>]+(?:class|id)=["'][^"']*(?:related|popular|share|social|advert|comment|widget|promo|sidebar|newsletter|subscribe|readmore|more-stories|below-post|author-bio|post-footer|cloud|cookie|popup|modal|dog_|sponsored)[^"']*["'][\s\S]*?<\/\1>/gi, ' ')
-      .replace(/<a[^>]+rel=["'][^"']*sponsored[^"']*["'][\s\S]*?<\/a>/gi, ' ')
-      .replace(/<iframe[^>]*src=["']([^"']+)["'][^>]*>[\s\S]*?<\/iframe>/gi, (m, src) => (/youtube|youtu\.be|vimeo|player\.vimeo/i.test(src) ? m : ' '))
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
-      .replace(/<form[\s\S]*?<\/form>/gi, ' ')
-      .slice(0, 40000);
-    if (cuerpo.length < 400) return null;
-    return cuerpo;
-  } catch {
-    return null;
-  }
-}
 
 app.get('/feed', auth, (req, res) => {
   const horas = Number(req.query.horas || 168);
@@ -547,12 +459,15 @@ app.patch('/articles/:id', auth, (req, res) => {
 });
 
 app.post('/articles/:id/clip', auth, (req, res) => {
-  const a = db.prepare('SELECT * FROM articles WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  // OJO: hay que traer el nombre de la fuente con un JOIN. Si se pasa undefined a
+  // node:sqlite, la consulta revienta (por eso los recortes daban error 500).
+  const a = db.prepare(`SELECT ar.*, s.nombre AS fuente FROM articles ar
+    JOIN sources s ON s.id=ar.source_id WHERE ar.id=? AND ar.user_id=?`).get(req.params.id, req.user.id);
   if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
   const { texto, nota } = req.body || {};
   if (!texto) return res.status(400).json({ error: 'Falta el fragmento de texto' });
   db.prepare('INSERT INTO clips(user_id,article_id,titulo,texto,nota,medio,link) VALUES(?,?,?,?,?,?,?)')
-    .run(req.user.id, a.id, a.titulo, String(texto).slice(0, 4000), String(nota || ''), a.fuente, a.link);
+    .run(req.user.id, a.id, a.titulo || null, String(texto).slice(0, 4000), String(nota || ''), a.fuente || null, a.link || null);
   res.json({ ok: true });
 });
 
