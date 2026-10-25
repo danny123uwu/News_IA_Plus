@@ -4,12 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portal IA News</title>
+  <!-- Logo de la pestaña: periodico.png -->
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="img/periodico.png" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
+  <meta name="theme-color" content="#1b2333" />
+  <meta name="description" content="Portal de noticias con agente de inteligencia artificial." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <!-- LOGIN -->
   <div id="vistaLogin" class="auth-box">
-    <h1>📰 Portal <span class="acento">IA</span> News</h1>
+    <h1><img class="logo-img grande" src="img/periodico.png" alt="" /> Portal <span class="acento">IA</span> News</h1>
     <p class="sub">Tu portal de noticias con inteligencia artificial</p>
     <div class="tabs-login">
       <button id="tabLogin" class="active">Entrar</button>
@@ -27,7 +34,7 @@
   <!-- APP -->
   <div id="vistaApp" class="oculto">
     <header class="topbar">
-      <div class="logo">📰 Portal <span class="acento">IA</span> News</div>
+      <div class="logo"><img class="logo-img" src="img/periodico.png" alt="" /> Portal <span class="acento">IA</span> News</div>
       <div class="buscador">
         <input type="text" id="buscar" placeholder="Buscar noticias… (Enter para fijar la búsqueda)" />
         <button type="button" id="btnLimpiarBusqueda" class="limpiar-busqueda oculto" title="Limpiar búsqueda">✖</button>

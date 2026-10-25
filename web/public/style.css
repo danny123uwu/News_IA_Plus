@@ -110,7 +110,10 @@ body.modal-abierto { overflow: hidden; }
   background: var(--surface); border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 50;
 }
-.logo { font-weight: 700; font-size: 1.1rem; white-space: nowrap; }
+.logo { font-weight: 700; font-size: 1.1rem; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.logo-img { width: 30px; height: 30px; object-fit: contain; flex: none; }
+.logo-img.grande { width: 40px; height: 40px; }
+.auth-box h1 { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .buscador { flex: 1; max-width: 480px; }
 .buscador input {
   width: 100%; background: var(--bg); border: 1px solid var(--border);
@@ -592,6 +595,7 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   .buscador { order: 4; flex: 0 0 100%; max-width: none; }
   .logo { font-size: 1rem; }
+  .logo-img { width: 26px; height: 26px; }
   .usuario { gap: 8px; }
   .tema-picker select { max-width: 74px; }
   .nav { overflow-x: auto; padding: 8px 12px; }

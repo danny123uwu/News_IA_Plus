@@ -340,7 +340,8 @@ curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
 - Importación automática (cada 15 min), clasificación con **30 categorías** en español (IA con fallback a reglas)
 - Feed "Para Ti" con burbujas → **portada por fuente**, filtros por tiempo, búsqueda con debounce y etiquetas
 - **Buscador mejorado**: filtra en vivo mientras escribís, con **Enter fija la búsqueda** (la barra se vacía sola y queda un chip 🔎 quitable), botón ✕ para limpiar y Escape para reiniciar
-- **🎨 Temas de color** (8 combinaciones: Oscuro, Claro, Cian, Púrpura, Celeste, Rojo, Verde, Naranja) elegibles desde el **perfil** o desde el topbar; se **guardan en la cuenta** y se aplican en todos los dispositivos. Iconos más grandes y coloridos
+- **🎨 Temas de color** (8 combinaciones: Oscuro, Claro, Cian, Púrpura, Celeste, Rojo, Verde, Naranja) elegibles desde el **perfil** o desde el topbar; se **guardan en la cuenta** y se aplican en todos los dispositivos
+- **Identidad propia**: iconos del menú (periódico, satélite, usuario, panel e IA) en `web/public/img/` y **favicon con el periódico** en la pestaña del navegador (`favicon.ico` + PNG 32/512 + apple-touch-icon)
 - **Topbar**: tu nombre y foto ahora son un **botón que te lleva a Mi perfil**
 - Modal de noticia: **texto de la noticia con su multimedia (imágenes, YouTube, Vimeo) en orden**, tomado del RSS (sin copiar la página original), resumen detallado con puntos clave a demanda, preguntar a la IA, recortes, Ver fuente
 - **Preferencia de idioma** (Español por defecto): traduce automáticamente el cuerpo de las noticias que vienen en otro idioma, conservando imágenes y videos en su lugar
