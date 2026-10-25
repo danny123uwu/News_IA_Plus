@@ -317,12 +317,14 @@ async function agregarFuente(nombre, url, btn) {
   const msg = $('fuenteMsg');
   const textoOriginal = btn ? btn.textContent : '';
   msg.className = 'msg';
-  msg.textContent = 'Probando y agregando…';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Agregando…'; }
+  msg.textContent = 'Buscando el feed del sitio…';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Buscando…'; }
   try {
     const d = await api(FEEDS, '/feeds', { method: 'POST', body: JSON.stringify({ nombre, url }) });
     msg.className = 'msg ok';
-    msg.textContent = '✓ "' + (d.titulo || nombre) + '" agregado';
+    const extra = d.corregida ? ' — feed detectado: ' + d.url : '';
+    msg.textContent = '✓ "' + (d.titulo || nombre) + '" agregado (' + (d.noticias || 0) + ' noticias)' + extra;
+    if (d.corregida) msg.title = d.url;
     if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('cat-ok'); btn.title = 'Agregado a tus fuentes'; }
     $('fuenteNombre').value = '';
     $('fuenteUrl').value = '';
@@ -331,6 +333,7 @@ async function agregarFuente(nombre, url, btn) {
   } catch (err) {
     msg.className = 'msg err';
     msg.textContent = err.message;
+    msg.title = err.message;
     if (btn) {
       btn.textContent = '❌ ' + err.message.slice(0, 42);
       btn.title = err.message;

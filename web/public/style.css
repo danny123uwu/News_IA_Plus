@@ -102,6 +102,7 @@ body.modal-abierto { overflow: hidden; }
 .error { color: var(--danger); font-size: .85rem; margin-top: 10px; min-height: 1em; }
 .msg { color: var(--muted); font-size: .85rem; margin-top: 8px; }
 .msg.ok { color: var(--ok); }
+.ayuda-fuente { font-size: .8rem; opacity: .85; margin-top: 6px; }
 
 /* TOPBAR */
 .topbar {
@@ -529,6 +530,21 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 }
 .nav .tab:hover .ico { transform: scale(1.08); }
 .nav .tab.active .ico { background: rgba(255, 255, 255, .22); }
+
+/* Iconos propios (img/): los PNG van tal cual y el SVG se pinta con el color
+   del texto, así se ve bien tanto en tema oscuro como en claro. */
+.ico-img { width: 20px; height: 20px; object-fit: contain; display: block; }
+.ico-mask {
+  width: 19px; height: 19px; display: block; background-color: currentColor;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+.ico-noticias {
+  -webkit-mask-image: url("img/icons8-noticias.svg");
+  mask-image: url("img/icons8-noticias.svg");
+}
+.nav .tab.active .ico-mask { background-color: #fff; }
 
 /* Títulos de sección con icono */
 .card-form h3, .vista > h3 { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }

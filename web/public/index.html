@@ -50,12 +50,12 @@
     <div class="burbujas" id="burbujas"></div>
 
     <nav class="nav">
-      <button class="tab active" data-vista="feed"><span class="ico">✨</span> Para Ti</button>
-      <button class="tab" data-vista="fuentes"><span class="ico">📡</span> Mis fuentes</button>
+      <button class="tab active" data-vista="feed"><span class="ico"><i class="ico-mask ico-noticias" aria-hidden="true"></i></span> Para Ti</button>
+      <button class="tab" data-vista="fuentes"><span class="ico"><img class="ico-img" src="img/senal-satelital.png" alt="" /></span> Mis fuentes</button>
       <button class="tab" data-vista="archivados"><span class="ico">📁</span> Archivados</button>
-      <button class="tab" data-vista="perfil"><span class="ico">👤</span> Mi perfil</button>
-      <button class="tab" data-vista="panel"><span class="ico">📊</span> Panel</button>
-      <button class="tab" data-vista="ia"><span class="ico">⚙️</span> IA</button>
+      <button class="tab" data-vista="perfil"><span class="ico"><img class="ico-img" src="img/usuario.png" alt="" /></span> Mi perfil</button>
+      <button class="tab" data-vista="panel"><span class="ico"><img class="ico-img" src="img/panel-de-control.png" alt="" /></span> Panel</button>
+      <button class="tab" data-vista="ia"><span class="ico"><img class="ico-img" src="img/configuracion-de-ia.png" alt="" /></span> IA</button>
     </nav>
 
     <main>
@@ -86,9 +86,10 @@
           <h3><span class="ico">➕</span> Agregar portal</h3>
           <div class="fila">
             <input type="text" id="fuenteNombre" placeholder="Nombre (ej: Hacker News)" />
-            <input type="url" id="fuenteUrl" placeholder="https://.../rss" />
+            <input type="url" id="fuenteUrl" placeholder="https://sitio.com  (o el enlace del RSS)" />
             <button id="btnAgregarFuente">Agregar</button>
           </div>
+          <p class="msg ayuda-fuente">Pegá la dirección del sitio y buscamos su RSS solo. Si preferís, pegá el enlace del feed directamente.</p>
           <p id="fuenteMsg" class="msg"></p>
           <div class="presets">
             <span>Rápidos:</span>

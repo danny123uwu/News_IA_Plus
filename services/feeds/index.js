@@ -3,8 +3,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
-const Parser = require('rss-parser');
 const { DatabaseSync } = require('node:sqlite');
+const { abrirFeed, normalizarUrl } = require('./rss');
 
 const app = express();
 app.use(cors());
@@ -62,18 +62,6 @@ const TAXONOMIA = [
   'Videojuegos', 'eSports', 'Economía', 'Empresas', 'Educación',
   'Deportes', 'Cine y Series', 'Música', 'Política', 'General'
 ];
-
-const parser = new Parser({
-  timeout: 10000,
-  customFields: {
-    item: [
-      ['media:content', 'media', { keepArray: true }],
-      ['media:thumbnail', 'thumb', { keepArray: true }],
-      'enclosure',
-      'content:encoded'
-    ]
-  }
-});
 
 function columnas(tabla) {
   return db.prepare(`PRAGMA table_info(${tabla})`).all().map((c) => c.name);
@@ -207,12 +195,20 @@ async function importarFuente(src, feedYaParseado) {
   let feed = feedYaParseado;
   if (!feed) {
     try {
-      feed = await parser.parseURL(src.url);
+      // abrirFeed() no solo lee el RSS: si la fuente guardada apunta a una
+      // página web, busca el feed de verdad y nos devuelve su URL.
+      const r = await abrirFeed(src.url);
+      feed = r.feed;
+      if (r.corregida && r.url && r.url !== src.url) {
+        db.prepare('UPDATE sources SET url=? WHERE id=?').run(r.url, src.id);
+        console.log('[feeds] fuente "' + src.nombre + '" corregida -> ' + r.url);
+      }
     } catch (e) {
       db.prepare('UPDATE sources SET ultimo_error=? WHERE id=?').run('No se pudo leer el feed: ' + e.message, src.id);
       return 0;
     }
   }
+
   db.prepare('UPDATE sources SET ultimo_error=NULL WHERE id=?').run(src.id);
   let nuevos = 0;
   const pendientes = [];
@@ -304,10 +300,17 @@ app.get('/taxonomy', auth, (req, res) => res.json({ etiquetas: TAXONOMIA }));
 
 app.post('/feeds/test', auth, async (req, res) => {
   try {
-    const f = await parser.parseURL(String(req.body.url || ''));
-    res.json({ ok: true, titulo: f.title || 'Feed válido', cantidad: (f.items || []).length });
+    const r = await abrirFeed(String(req.body.url || ''));
+    res.json({
+      ok: true,
+      titulo: r.feed.title || 'Feed válido',
+      cantidad: (r.feed.items || []).length,
+      url: r.url,
+      corregida: r.corregida,
+      metodo: r.metodo
+    });
   } catch (e) {
-    res.json({ ok: false, error: 'No parece un RSS válido: ' + e.message });
+    res.json({ ok: false, error: e.message });
   }
 });
 
@@ -317,25 +320,43 @@ app.get('/feeds', auth, (req, res) => {
 });
 
 app.post('/feeds', auth, async (req, res) => {
-  const url = String(req.body.url || '').trim();
-  const nombre = String(req.body.nombre || '').trim() || url;
-  if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: 'La URL debe empezar con http(s)://' });
-  const repetida = db.prepare('SELECT id FROM sources WHERE user_id=? AND url=?').get(req.user.id, url);
-  if (repetida) return res.status(409).json({ error: 'Ese portal ya está en tus fuentes' });
-  let f;
-  try {
-    f = await parser.parseURL(url);
-  } catch (e) {
-    return res.status(400).json({ error: 'No se pudo leer ese RSS: ' + e.message });
+  const pedida = String(req.body.url || '').trim();
+  const nombre = String(req.body.nombre || '').trim() || pedida;
+  if (!pedida) return res.status(400).json({ error: 'Falta la dirección del portal' });
+  if (!/^https?:\/\//.test(pedida) && !/^[\w.-]+\.[a-z]{2,}/i.test(pedida)) {
+    return res.status(400).json({ error: 'La URL debe empezar con http(s)://' });
   }
-  const r = db.prepare('INSERT INTO sources(user_id,nombre,url) VALUES(?,?,?)').run(req.user.id, nombre, url);
-  const src = db.prepare('SELECT * FROM sources WHERE id=?').get(r.lastInsertRowid);
+
+  // abrirFeed(): si pegaste la portada del sitio, busca el feed y devuelve su URL.
+  let r;
   try {
-    await importarFuente(src, f);
+    r = await abrirFeed(pedida);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  const url = r.url || normalizarUrl(pedida);
+  const repetida = db.prepare('SELECT id, nombre FROM sources WHERE user_id=? AND url=?').get(req.user.id, url);
+  if (repetida) {
+    return res.status(409).json({ error: 'Ese portal ya está en tus fuentes: "' + repetida.nombre + '"' });
+  }
+
+  const rr = db.prepare('INSERT INTO sources(user_id,nombre,url) VALUES(?,?,?)').run(req.user.id, nombre, url);
+  const src = db.prepare('SELECT * FROM sources WHERE id=?').get(rr.lastInsertRowid);
+  try {
+    await importarFuente(src, r.feed);
   } catch (e) {
     db.prepare('UPDATE sources SET ultimo_error=? WHERE id=?').run('Error al importar: ' + e.message, src.id);
   }
-  res.json({ ok: true, id: r.lastInsertRowid, titulo: f.title || nombre });
+  res.json({
+    ok: true,
+    id: rr.lastInsertRowid,
+    titulo: r.feed.title || nombre,
+    url,
+    corregida: !!r.corregida,
+    metodo: r.metodo,
+    noticias: (r.feed.items || []).length
+  });
 });
 
 app.put('/feeds/:id', auth, (req, res) => {

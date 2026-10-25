@@ -2,7 +2,7 @@
 
 Portal de noticias con agente de inteligencia artificial — **3 microservicios + JWT + IA local o API externa**.
 
-> **Estado: 18 oct 2026** — alfa usable. Ya incluye **Docker + Nginx (proxy inverso)**, **temas de color** y **API de IA externa**. Lo que falta está listado abajo en [Pendiente](#pendiente-falta).
+> **Estado: 25 oct 2026** — alfa usable. Ya incluye **Docker + Nginx (proxy inverso)**, **temas de color**, **API de IA externa** y **autodescubrimiento de feeds RSS**. Lo que falta está listado abajo en [Pendiente](#pendiente-falta).
 
 ## Requisitos
 - **Node.js 22.5+** (recomendado 24 LTS) — descargar de https://nodejs.org (funciona en **Windows, macOS y Linux**; usa `node:sqlite` incluido, sin compilar nada)
@@ -94,6 +94,7 @@ Modelos recomendados (pensados para equipos humildes, ~2 GB de VRAM):
 ./portal.sh logs agente        # logs en vivo de un servicio
 ./portal.sh eliminar           # borra contenedores, modelos e imagen
 ./portal.sh borrar-todo        # borra TODO, incluida la base de datos
+npm run test:feeds             # prueba el autodescubrimiento de feeds (5 sitios reales)
 ```
 
 Los datos (`data/`) se guardan en tu carpeta del proyecto, así que **no se pierden** al apagar los contenedores.
@@ -113,10 +114,13 @@ portal-ianews/
 ├── services/
 │   ├── auth/           # registro, login, JWT, perfil (puerto 3001)
 │   ├── feeds/          # fuentes RSS, artículos, feed (puerto 3002)
+│   │   ├── index.js    # endpoints + importación
+│   │   └── rss.js      # descubre el feed del sitio y parsea XML roto
 │   └── agent/          # agente IA (puerto 3003)
 ├── web/                # frontend (puerto 8090)
 │   └── public/
 │       ├── catalogo.js # catálogo de ~150 portales tech con RSS
+│       ├── img/        # iconos propios del menú (SVG/PNG)
 │       ├── app.js
 │       └── style.css
 └── data/               # bases de datos y llaves de IA (NO se sube a git)
@@ -137,7 +141,7 @@ Comunicación: el frontend (y entre sí) hablan por HTTP con `Authorization: Bea
 
 ## Recorrido rápido
 1. Crear cuenta en la página
-2. "Mis fuentes" → **catálogo con buscador** (~150 portales por categoría, un clic para agregar) o presets rápidos
+2. "Mis fuentes" → **catálogo con buscador** (~150 portales por categoría, un clic para agregar) o presets rápidos. En "Agregar portal" podés pegar **la dirección del sitio** (no hace falta el enlace del RSS): el sistema **busca el feed** y guarda la URL correcta.
 3. "Para Ti" → feed ordenado por prioridad; **🎛 Prioridades** arriba del feed y **▲▼** en cada tarjeta; clic en cualquier parte de la tarjeta abre la noticia
 4. Burbujas superiores → **portada** de esa fuente estilo periódico
 5. Abrir una noticia → **el texto de la noticia tal como lo publica el medio, con sus imágenes y videos en el mismo orden** (se usa solo lo que trae el RSS; no se copia la página original). Debajo, el resumen IA a demanda y el botón "Ver fuente" para la nota completa.
@@ -285,6 +289,33 @@ Con IA local: `./portal.sh modelos` (baja los modelos) y, si tenés NVIDIA, `./p
 
 ---
 
+### 📰 Fuentes y feeds RSS
+
+**24. "No se pudo leer ese RSS: Status code 404" / "Unexpected close tag…" (sitio real que sí existe)**
+- *Síntoma:* pegás la dirección de un portal real (p. ej. `https://laboratoriolinux.es/index.php`) y falla aunque el sitio abra bien en el navegador.
+- *Causa:* **estabas pegando la página web, no el feed.** Dos mensajes distintos para el mismo problema:
+  - `Status code 404` → en esa ruta no hay feed.
+  - `Unexpected close tag` → el parser intentaba leer **HTML** como si fuera XML (de ahí el "close tag").
+- *Solución:* `services/feeds/rss.js` ahora hace **autodescubrimiento**. Al agregar una fuente:
+  1. Si ya es un feed, lo usa.
+  2. Si es una página, busca el feed que el propio sitio declara (`<link rel="alternate" type="application/rss+xml">`), después enlaces tipo "RSS/Suscribirse" y por último rutas típicas: `/feed`, `/rss.xml`, `/?feed=rss2`, Joomla `?format=feed&type=rss`, Blogger `/feeds/posts/default`, WordPress `/wp-json/wp/v2/posts`, etc.
+  3. Guarda **la URL del feed** (no la de la página) y te avisa: *"feed detectado: …"*.
+- *Bonus:* las fuentes viejas **se arreglan solas** en el siguiente refresco (si la URL guardada no es un feed, se corrige en la base).
+
+**25. Un feed real tiene el XML roto y no carga**
+- *Causa:* `&` sin escapar, `<br>` sin cerrar dentro de una descripción, `&nbsp;`/`&mdash;` (entidades HTML, no XML), un aviso de PHP antes del `<?xml?>`, o basura después del `</rss>`.
+- *Solución:* antes de parsear se **sanea** el XML (entidades, caracteres de control, basura alrededor de la raíz) y se reintenta con un parser **tolerante**; si aún así falla, se **rescatan los `<item>`** a mano. También se normalizan títulos con entidades (`&quot;` → `"`) y se convierten los enlaces relativos en absolutos.
+
+**26. El sitio bloquea las lecturas automáticas (HTTP 403)**
+- *Causa:* protección anti-bot/Cloudflare.
+- *Solución:* se descarga con **User-Agent de navegador** y cabeceras `Accept` de feed, lo que evita la mayoría de los bloqueos. Si el sitio igual bloquea, el mensaje ahora lo dice explícitamente en vez de mostrar un error técnico.
+
+**27. Hay que ser paciente con un sitio sin feed**
+- *Causa:* si no hay feed, se prueban hasta ~25 direcciones candidatas.
+- *Solución:* se prueban **4 en paralelo** con 8 s de espera y se corta en cuanto una funciona. Normal: 0,2–2 s. Peor caso (sitio caído): unos 25 s y después un mensaje claro.
+
+---
+
 ### 📋 Chuleta de diagnóstico
 
 ```bash
@@ -294,6 +325,9 @@ curl -s localhost/agente/health                      # ¿responde la IA?
 docker compose exec ollama ollama ps                 # ¿modelo cargado? ¿GPU o CPU?
 docker compose exec ollama ollama list               # modelos instalados
 docker compose config >/dev/null && echo "compose OK" # valida el YAML
+npm run test:feeds                                   # ¿el autodescubrimiento de RSS anda?
+curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"url":"https://www.theverge.com"}'
 ```
 
 ## Estado
@@ -301,6 +335,7 @@ docker compose config >/dev/null && echo "compose OK" # valida el YAML
 ### Hecho ✅
 - Registro/login con JWT y roles en el token; perfil con foto e intereses
 - CRUD de fuentes RSS con prueba de URL, pausa y presets; **catálogo de ~150 portales** con buscador y acordeones por categoría
+- **Agregar portal a prueba de balas**: pegás la **página** del medio y el sistema **encuentra su RSS** (autodescubrimiento + rutas típicas + WordPress/Joomla/Blogger/FeedBurner) y guarda la URL correcta; las fuentes viejas se autocorrigen. Parser tolerante para feeds con XML roto
 - **Prioridades solo en el feed** (panel con sliders + ▲▼ inline en las tarjetas)
 - Importación automática (cada 15 min), clasificación con **30 categorías** en español (IA con fallback a reglas)
 - Feed "Para Ti" con burbujas → **portada por fuente**, filtros por tiempo, búsqueda con debounce y etiquetas
