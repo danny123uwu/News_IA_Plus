@@ -162,6 +162,22 @@ body.modal-abierto { overflow: hidden; }
 .btn-icono { background: none; border: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
 .btn-icono:hover { color: var(--danger); }
 
+/* Botón de salir con el icono de apagado (junto a la foto del usuario) */
+.btn-salir {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(30px * var(--icono-factor, 1)); height: calc(30px * var(--icono-factor, 1));
+  padding: 0; border-radius: 50%; line-height: 0;
+  transition: transform .12s;
+}
+.btn-salir img {
+  width: 100%; height: 100%; display: block; border-radius: 50%;
+  object-fit: contain; opacity: .9; transition: opacity .12s, transform .12s;
+}
+.btn-salir:hover { transform: translateY(-1px); }
+.btn-salir:hover img { opacity: 1; transform: scale(1.06); }
+.btn-salir:active { transform: scale(.95); }
+.btn-salir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* BURBUJAS */
 .burbujas {
   display: flex; gap: 14px; padding: 14px 18px; overflow-x: auto;
