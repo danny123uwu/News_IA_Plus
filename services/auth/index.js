@@ -40,6 +40,26 @@ if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('t
   db.exec("ALTER TABLE users ADD COLUMN tema TEXT DEFAULT 'oscuro'");
 }
 
+// ---------- Accesibilidad / apariencia del texto ----------
+// Cada preferencia se guarda como un id corto y se valida contra su lista.
+const FUENTES = ['sistema', 'humanista', 'geometrica', 'serif', 'mono', 'redondeada'];
+const TAMANOS = ['chico', 'normal', 'grande', 'enorme'];
+const COLORES_TEXTO = ['auto', 'blanco', 'negro', 'azul', 'verde', 'ambar', 'rosa', 'cian', 'violeta', 'gris'];
+const TAMANOS_ICONOS = ['chico', 'normal', 'grande', 'enorme'];
+const COLUMNAS_APARIENCIA = [
+  ['fuente', 'sistema'],
+  ['tamano_texto', 'normal'],
+  ['color_texto', 'auto'],
+  ['tamano_iconos', 'normal']
+];
+{
+  const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  for (const [col, porDefecto] of COLUMNAS_APARIENCIA) {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT DEFAULT '${porDefecto}'`);
+  }
+}
+const elegir = (valor, lista, porDefecto) => (lista.includes(valor) ? valor : porDefecto);
+
 function hash(p) {
   const s = crypto.randomBytes(16).toString('hex');
   return s + ':' + crypto.scryptSync(p, s, 64).toString('hex');
@@ -52,7 +72,14 @@ function sign(u) {
   return jwt.sign({ id: u.id, email: u.email, rol: u.rol }, SECRET, { expiresIn: '8h' });
 }
 function publicUser(u) {
-  return { id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, foto: u.foto, intereses: JSON.parse(u.intereses || '[]'), idioma: u.idioma || 'es', tema: u.tema || 'oscuro' };
+  return {
+    id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, foto: u.foto,
+    intereses: JSON.parse(u.intereses || '[]'), idioma: u.idioma || 'es', tema: u.tema || 'oscuro',
+    fuente: u.fuente || 'sistema',
+    tamanoTexto: u.tamano_texto || 'normal',
+    colorTexto: u.color_texto || 'auto',
+    tamanoIconos: u.tamano_iconos || 'normal'
+  };
 }
 function auth(req, res, next) {
   try {
@@ -92,14 +119,19 @@ app.get('/me', auth, (req, res) => {
 });
 
 app.put('/me', auth, (req, res) => {
-  const { nombre, intereses, idioma, tema } = req.body || {};
+  const { nombre, intereses, idioma, tema, fuente, tamanoTexto, colorTexto, tamanoIconos } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-  db.prepare('UPDATE users SET nombre=?, intereses=?, idioma=?, tema=? WHERE id=?').run(
+  db.prepare(`UPDATE users SET nombre=?, intereses=?, idioma=?, tema=?,
+              fuente=?, tamano_texto=?, color_texto=?, tamano_iconos=? WHERE id=?`).run(
     nombre !== undefined ? String(nombre) : u.nombre,
     intereses !== undefined ? JSON.stringify(intereses) : u.intereses,
     idioma !== undefined ? (['es', 'en'].includes(idioma) ? idioma : 'es') : (u.idioma || 'es'),
     tema !== undefined ? (TEMAS.includes(tema) ? tema : 'oscuro') : (u.tema || 'oscuro'),
+    fuente !== undefined ? elegir(fuente, FUENTES, 'sistema') : (u.fuente || 'sistema'),
+    tamanoTexto !== undefined ? elegir(tamanoTexto, TAMANOS, 'normal') : (u.tamano_texto || 'normal'),
+    colorTexto !== undefined ? elegir(colorTexto, COLORES_TEXTO, 'auto') : (u.color_texto || 'auto'),
+    tamanoIconos !== undefined ? elegir(tamanoIconos, TAMANOS_ICONOS, 'normal') : (u.tamano_iconos || 'normal'),
     u.id
   );
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)));

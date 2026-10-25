@@ -67,6 +67,122 @@ function aplicarTema(tema, guardar) {
   }
 }
 
+// ---------- APARIENCIA: letra, tamaño, color del texto y tamaño de iconos ----------
+// Igual que el tema: se guarda en tu cuenta (y en localStorage para que se vea
+// al instante, incluso antes de iniciar sesión).
+const FUENTES = ['sistema', 'humanista', 'geometrica', 'redondeada', 'serif', 'mono'];
+const TAMANOS_TEXTO = [
+  { id: 'chico',  escala: 0.9 },
+  { id: 'normal', escala: 1 },
+  { id: 'grande', escala: 1.12 },
+  { id: 'enorme', escala: 1.28 }
+];
+const COLORES_TEXTO = [
+  { id: 'auto' }, { id: 'blanco', hex: '#ffffff' }, { id: 'negro', hex: '#0b0f14' },
+  { id: 'azul', hex: '#6cb8ff' }, { id: 'verde', hex: '#4ade80' }, { id: 'ambar', hex: '#fbbf24' },
+  { id: 'rosa', hex: '#f472b6' }, { id: 'cian', hex: '#22d3ee' }, { id: 'violeta', hex: '#c084fc' },
+  { id: 'gris', hex: '#b9c2cc' }
+];
+const TAMANOS_ICONOS = [
+  { id: 'chico',  factor: 0.85 },
+  { id: 'normal', factor: 1 },
+  { id: 'grande', factor: 1.22 },
+  { id: 'enorme', factor: 1.45 }
+];
+
+const APARIENCIA_DEFECTO = { fuente: 'sistema', tamanoTexto: 'normal', colorTexto: 'auto', tamanoIconos: 'normal' };
+let apariencia = Object.assign({}, APARIENCIA_DEFECTO);
+try {
+  const guardada = JSON.parse(localStorage.getItem('apariencia') || '{}');
+  for (const k of Object.keys(APARIENCIA_DEFECTO)) if (guardada[k]) apariencia[k] = guardada[k];
+} catch {}
+
+// El topbar es sticky y el nav se pega justo debajo: hay que medirlo de verdad
+// (cambia con el tamaño de letra y en pantallas chicas).
+function ajustarTopbar() {
+  const tb = document.querySelector('.topbar');
+  if (!tb) return;
+  const alto = tb.offsetHeight;
+  if (alto > 0) document.documentElement.style.setProperty('--topbar-alto', alto + 'px');
+}
+window.addEventListener('resize', ajustarTopbar);
+
+function aplicarApariencia(guardar) {
+  const fuente = FUENTES.includes(apariencia.fuente) ? apariencia.fuente : 'sistema';
+  const tamano = TAMANOS_TEXTO.find((t) => t.id === apariencia.tamanoTexto) || TAMANOS_TEXTO[1];
+  const color = COLORES_TEXTO.some((c) => c.id === apariencia.colorTexto) ? apariencia.colorTexto : 'auto';
+  const iconos = TAMANOS_ICONOS.find((i) => i.id === apariencia.tamanoIconos) || TAMANOS_ICONOS[1];
+  apariencia = { fuente, tamanoTexto: tamano.id, colorTexto: color, tamanoIconos: iconos.id };
+
+  document.body.dataset.fuente = fuente;
+  document.body.dataset.color = color;
+  document.body.dataset.iconos = iconos.id;
+  document.documentElement.style.setProperty('--escala', String(tamano.escala));
+  localStorage.setItem('apariencia', JSON.stringify(apariencia));
+  pintarApariencia();
+  // La barra de navegación es sticky debajo del topbar: si cambia el tamaño de
+  // letra, el alto del topbar cambia y hay que recalcularlo.
+  requestAnimationFrame(ajustarTopbar);
+
+  if (guardar && yo) {
+    api(AUTH, '/me', { method: 'PUT', body: JSON.stringify(apariencia) })
+      .then((u) => {
+        yo = u;
+        if ($('aparienciaMsg')) $('aparienciaMsg').textContent = 'Guardado en tu cuenta ✓ (se aplica en todos tus dispositivos)';
+      })
+      .catch((e) => { if ($('aparienciaMsg')) $('aparienciaMsg').textContent = '⚠️ No se pudo guardar: ' + e.message; });
+  }
+}
+
+function pintarApariencia() {
+  const selFuente = $('perfilFuente');
+  if (selFuente) selFuente.value = apariencia.fuente;
+
+  const marcar = (contenedor, activo) => {
+    const caja = $(contenedor);
+    if (!caja) return;
+    caja.querySelectorAll('[data-valor]').forEach((b) => b.classList.toggle('on', b.dataset.valor === activo));
+  };
+  marcar('cajaTamanoTexto', apariencia.tamanoTexto);
+  marcar('cajaTamanoIconos', apariencia.tamanoIconos);
+
+  const cajaColor = $('cajaColorTexto');
+  if (cajaColor && !cajaColor.childElementCount) {
+    cajaColor.innerHTML = COLORES_TEXTO.map((c) => c.id === 'auto'
+      ? '<button type="button" class="chip-color auto" data-color="auto" title="Usar el color del tema">Auto</button>'
+      : '<button type="button" class="chip-color" data-color="' + c.id + '" style="color:' + c.hex + '" title="' + c.id + '">Aa</button>'
+    ).join('');
+    cajaColor.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => {
+      apariencia.colorTexto = b.dataset.color;
+      aplicarApariencia(true);
+    }));
+  }
+  if (cajaColor) cajaColor.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('activo', b.dataset.color === apariencia.colorTexto));
+}
+
+if ($('perfilFuente')) {
+  $('perfilFuente').addEventListener('change', () => {
+    apariencia.fuente = $('perfilFuente').value;
+    aplicarApariencia(true);
+  });
+}
+document.querySelectorAll('#cajaTamanoTexto [data-valor]').forEach((b) => b.addEventListener('click', () => {
+  apariencia.tamanoTexto = b.dataset.valor;
+  aplicarApariencia(true);
+}));
+document.querySelectorAll('#cajaTamanoIconos [data-valor]').forEach((b) => b.addEventListener('click', () => {
+  apariencia.tamanoIconos = b.dataset.valor;
+  aplicarApariencia(true);
+}));
+if ($('btnResetApariencia')) {
+  $('btnResetApariencia').addEventListener('click', () => {
+    apariencia = Object.assign({}, APARIENCIA_DEFECTO);
+    aplicarApariencia(true);
+    toast('Apariencia restablecida ↺');
+  });
+}
+aplicarApariencia(false);
+
 function tagsDe(a) {
   if (Array.isArray(a.etiquetas)) return a.etiquetas;
   try { return JSON.parse(a.etiquetas || '[]'); } catch { return []; }
@@ -189,6 +305,14 @@ async function entrar(datos) {
     $('perfilNombre').value = yo.nombre;
     $('perfilIdioma').value = yo.idioma || 'es';
     aplicarTema(yo.tema || temaActual, false); // el tema de tu cuenta manda
+    // La apariencia del texto/iconos también manda desde la cuenta
+    apariencia = {
+      fuente: yo.fuente || apariencia.fuente,
+      tamanoTexto: yo.tamanoTexto || apariencia.tamanoTexto,
+      colorTexto: yo.colorTexto || apariencia.colorTexto,
+      tamanoIconos: yo.tamanoIconos || apariencia.tamanoIconos
+    };
+    aplicarApariencia(false);
     pintarTemas();
     await Promise.all([cargarFuentes(), cargarTaxonomia(), cargarFeed(), cargarPanel()]);
     cargarIA().catch(() => {});

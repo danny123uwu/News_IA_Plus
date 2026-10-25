@@ -29,7 +29,15 @@
   --avatar-bg: #333333;
   --overlay: rgba(0, 0, 0, .7);
   --sombra: 0 10px 30px rgba(0, 0, 0, .35);
+
+  /* Apariencia (perfil → "Texto e iconos") */
+  --fuente: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --escala: 1;          /* tamaño de la letra (lo cambia el perfil) */
+  --icono-factor: 1;    /* tamaño de los iconos (lo cambia el perfil) */
 }
+
+/* La escala se aplica al <html> para que TODOS los rem crezcan juntos */
+html { font-size: calc(100% * var(--escala, 1)); }
 
 /* Tema CLARO: además de acentos, cambia superficies, textos y bordes */
 body[data-tema="claro"] {
@@ -66,8 +74,38 @@ body[data-tema="rojo"]    { --accent:#ef4444; --accent-hover:#dc2626; --accent-s
 body[data-tema="verde"]   { --accent:#22c55e; --accent-hover:#16a34a; --accent-soft:#4ade80; --accent-dim:#0f3d24; --accent-faint:#0a2b19; --accent-glow:#22c55e33; }
 body[data-tema="naranja"] { --accent:#f97316; --accent-hover:#ea580c; --accent-soft:#fb923c; --accent-dim:#4a2a0f; --accent-faint:#331d0a; --accent-glow:#f9731633; }
 
+/* =====================================================================
+   APARIENCIA DEL TEXTO E ICONOS  (perfil → "Texto e iconos")
+   Se aplica con atributos en <body>: data-fuente / data-color / data-iconos,
+   y la escala de letra con la variable --escala en <html>.
+   Estas reglas van DESPUÉS de los temas para poder pisar --text.
+   ===================================================================== */
+
+/* Tipo de letra (pilas del sistema: no baja nada de internet) */
+body[data-fuente="humanista"]  { --fuente: Verdana, Geneva, Tahoma, sans-serif; }
+body[data-fuente="geometrica"] { --fuente: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif; }
+body[data-fuente="redondeada"] { --fuente: "Comic Sans MS", "Segoe UI", Verdana, sans-serif; }
+body[data-fuente="serif"]      { --fuente: Georgia, "Times New Roman", Times, serif; }
+body[data-fuente="mono"]       { --fuente: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace; }
+
+/* Color de las letras (Automático = el que trae el tema) */
+body[data-color="blanco"]  { --text: #ffffff; --text-dim: #e8ecf1; }
+body[data-color="negro"]   { --text: #0b0f14; --text-dim: #1d2530; }
+body[data-color="azul"]    { --text: #6cb8ff; --text-dim: #a8d3ff; }
+body[data-color="verde"]   { --text: #4ade80; --text-dim: #9ff0bd; }
+body[data-color="ambar"]   { --text: #fbbf24; --text-dim: #fde3a2; }
+body[data-color="rosa"]    { --text: #f472b6; --text-dim: #fbb6d8; }
+body[data-color="cian"]    { --text: #22d3ee; --text-dim: #a5eef7; }
+body[data-color="violeta"] { --text: #c084fc; --text-dim: #e0c8ff; }
+body[data-color="gris"]    { --text: #b9c2cc; --text-dim: #d5dbe2; }
+
+/* Tamaño de los iconos */
+body[data-iconos="chico"]  { --icono-factor: .85; }
+body[data-iconos="grande"] { --icono-factor: 1.22; }
+body[data-iconos="enorme"] { --icono-factor: 1.45; }
+
 body {
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--fuente);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -146,7 +184,7 @@ body.modal-abierto { overflow: hidden; }
 /* NAV */
 .nav {
   display: flex; gap: 4px; padding: 8px 18px; background: var(--surface);
-  border-bottom: 1px solid var(--border); position: sticky; top: 54px; z-index: 40;
+  border-bottom: 1px solid var(--border); position: sticky; top: var(--topbar-alto, 54px); z-index: 40;
 }
 .nav .tab {
   background: none; border: none; color: var(--muted); padding: 9px 14px;
@@ -304,6 +342,34 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   padding: 7px 13px; border-radius: 999px; cursor: pointer; font-size: .85rem;
 }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Perfil → "Texto e iconos" */
+.campo-apariencia { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.campo-apariencia > label,
+.campo-apariencia > span {
+  font-size: .82rem; font-weight: 600; letter-spacing: .2px;
+  color: var(--muted); text-transform: uppercase;
+}
+.campo-apariencia select { max-width: 400px; }
+.campo-apariencia small { text-transform: none; letter-spacing: 0; }
+.chips-color { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-color {
+  width: 46px; height: 40px; border-radius: 10px; cursor: pointer;
+  background: var(--surface-2); border: 2px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1rem; line-height: 1;
+  transition: border-color .15s, transform .1s;
+}
+.chip-color:hover { transform: translateY(-2px); }
+.chip-color.activo { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.chip-color.auto { width: auto; padding: 0 12px; font-size: .78rem; font-weight: 600; }
+.vista-previa {
+  margin-top: 18px; padding: 14px 16px; border-radius: 12px;
+  background: var(--surface-2); border: 1px dashed var(--border);
+  color: var(--text); font-size: 1rem; line-height: 1.5;
+}
+#btnResetApariencia { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
+#btnResetApariencia:hover { border-color: var(--accent); }
 
 /* PANEL */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -483,7 +549,7 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 /* =====================================================================
    REDISEÑO: iconos, topbar, temas y búsqueda
    ===================================================================== */
-.ico { font-size: 1.2em; line-height: 1; display: inline-block; vertical-align: -1px; }
+.ico { font-size: calc(1.2em * var(--icono-factor, 1)); line-height: 1; display: inline-block; vertical-align: -1px; }
 
 /* Topbar */
 .topbar { box-shadow: 0 1px 0 var(--border); }
@@ -503,7 +569,7 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 999px; padding: 4px 8px 4px 10px;
 }
-.tema-picker .ico { font-size: 1.05rem; }
+.tema-picker .ico { font-size: calc(1.05rem * var(--icono-factor, 1)); }
 .tema-picker select {
   background: none; border: none; color: var(--text); font-size: .82rem;
   cursor: pointer; outline: none; max-width: 110px;
@@ -527,18 +593,19 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   padding: 8px 15px 8px 9px; font-size: .95rem; font-weight: 500;
 }
 .nav .tab .ico {
-  width: 30px; height: 30px; border-radius: 9px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent-dim); font-size: 1rem; transition: transform .15s;
+  width: calc(30px * var(--icono-factor, 1)); height: calc(30px * var(--icono-factor, 1));
+  border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-dim); font-size: calc(1rem * var(--icono-factor, 1)); transition: transform .15s;
 }
 .nav .tab:hover .ico { transform: scale(1.08); }
 .nav .tab.active .ico { background: rgba(255, 255, 255, .22); }
 
 /* Iconos propios (img/): los PNG van tal cual y el SVG se pinta con el color
    del texto, así se ve bien tanto en tema oscuro como en claro. */
-.ico-img { width: 20px; height: 20px; object-fit: contain; display: block; }
+.ico-img { width: calc(20px * var(--icono-factor, 1)); height: calc(20px * var(--icono-factor, 1)); object-fit: contain; display: block; }
 .ico-mask {
-  width: 19px; height: 19px; display: block; background-color: currentColor;
+  width: calc(19px * var(--icono-factor, 1)); height: calc(19px * var(--icono-factor, 1));
+  display: block; background-color: currentColor;
   -webkit-mask-position: center; mask-position: center;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-size: contain; mask-size: contain;
@@ -551,7 +618,7 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 
 /* Títulos de sección con icono */
 .card-form h3, .vista > h3 { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
-.card-form h3 .ico, .vista > h3 .ico { font-size: 1.15rem; }
+.card-form h3 .ico, .vista > h3 .ico { font-size: calc(1.15rem * var(--icono-factor, 1)); }
 
 /* Selector de tema (perfil) con muestras de color */
 .chips-tema { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -582,7 +649,7 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 
 /* Iconos un pelín más grandes en botones de acción */
 .acciones button .ico, .acciones a .ico,
-.card-form button .ico, .barra-feed button .ico { font-size: 1.15em; }
+.card-form button .ico, .barra-feed button .ico { font-size: calc(1.15em * var(--icono-factor, 1)); }
 
 /* mensajes de error */
 .msg.err { color: var(--danger); }

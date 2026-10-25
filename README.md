@@ -146,7 +146,7 @@ Comunicación: el frontend (y entre sí) hablan por HTTP con `Authorization: Bea
 4. Burbujas superiores → **portada** de esa fuente estilo periódico
 5. Abrir una noticia → **el texto de la noticia tal como lo publica el medio, con sus imágenes y videos en el mismo orden** (se usa solo lo que trae el RSS; no se copia la página original). Debajo, el resumen IA a demanda y el botón "Ver fuente" para la nota completa.
 6. "☀ Digest de hoy" → resumen del día con IA
-7. "Mi perfil" → foto, nombre, **🎨 tema de color** (8 combinaciones), **idioma de las noticias** (Español / English) y etiquetas de interés. En Español, las noticias que vengan en otro idioma se traducen solas (título y cuerpo).
+7. "Mi perfil" → foto, nombre, **🎨 tema de color** (8 combinaciones), **🔠 texto e iconos** (tipo de letra, tamaño de la letra, color de las letras y tamaño de los iconos), **idioma de las noticias** (Español / English) y etiquetas de interés. Todo se guarda en tu cuenta. En Español, las noticias que vengan en otro idioma se traducen solas (título y cuerpo).
 8. "⚙️ IA" → motor local (Ollama) o **API externa** (Google AI Studio/Gemini, Claude, Groq, OpenAI, DeepSeek, OpenRouter). Botón **🔄 Ver modelos** que lista los modelos que tu propia API key tiene disponibles, para elegir de una lista en vez de escribirlo a mano.
 9. **Buscar**: filtra mientras escribís; **Enter fija la búsqueda** (la barra se vacía y aparece un chip 🔎 que podés quitar). Clic en tu **nombre/foto** del topbar → te lleva a tu perfil.
 
@@ -342,6 +342,7 @@ curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
 - **Buscador mejorado**: filtra en vivo mientras escribís, con **Enter fija la búsqueda** (la barra se vacía sola y queda un chip 🔎 quitable), botón ✕ para limpiar y Escape para reiniciar
 - **🎨 Temas de color** (8 combinaciones: Oscuro, Claro, Cian, Púrpura, Celeste, Rojo, Verde, Naranja) elegibles desde el **perfil** o desde el topbar; se **guardan en la cuenta** y se aplican en todos los dispositivos
 - **Identidad propia**: iconos del menú (periódico, satélite, usuario, panel e IA) en `web/public/img/` y **favicon con el periódico** en la pestaña del navegador (`favicon.ico` + PNG 32/512 + apple-touch-icon)
+- **Perfil → "Texto e iconos" (accesibilidad)**: **tipo de letra** (sistema, Verdana, Trebuchet, redondeada, Georgia, monoespaciada), **tamaño de la letra** (pequeña → muy grande, escala todo el sitio), **color de las letras** (10 opciones o automático según el tema) y **tamaño de los iconos** (chicos → muy grandes). Se guarda en la cuenta (`users.fuente`, `tamano_texto`, `color_texto`, `tamano_iconos`), se aplica al instante y hay botón para volver a lo de siempre
 - **Topbar**: tu nombre y foto ahora son un **botón que te lleva a Mi perfil**
 - Modal de noticia: **texto de la noticia con su multimedia (imágenes, YouTube, Vimeo) en orden**, tomado del RSS (sin copiar la página original), resumen detallado con puntos clave a demanda, preguntar a la IA, recortes, Ver fuente
 - **Preferencia de idioma** (Español por defecto): traduce automáticamente el cuerpo de las noticias que vienen en otro idioma, conservando imágenes y videos en su lugar

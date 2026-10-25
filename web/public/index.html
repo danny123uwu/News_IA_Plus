@@ -142,6 +142,56 @@
           <p class="msg" id="temaMsg"></p>
         </div>
         <div class="card-form">
+          <h3><span class="ico">🔠</span> Texto e iconos</h3>
+          <p class="msg">Ajustá la lectura a tu gusto: letra, tamaño, color del texto y tamaño de los iconos. Se guarda en tu cuenta, igual que el tema.</p>
+
+          <div class="campo-apariencia">
+            <label for="perfilFuente">Tipo de letra</label>
+            <select id="perfilFuente">
+              <option value="sistema">Sistema — moderna y limpia</option>
+              <option value="humanista">Humanista — Verdana, muy legible</option>
+              <option value="geometrica">Geométrica — Trebuchet</option>
+              <option value="redondeada">Redondeada — suave</option>
+              <option value="serif">Serif — Georgia, estilo diario</option>
+              <option value="mono">Monoespaciada — tipo código</option>
+            </select>
+          </div>
+
+          <div class="campo-apariencia">
+            <span>Tamaño de la letra</span>
+            <div class="chips-seleccion" id="cajaTamanoTexto">
+              <button type="button" class="chip" data-valor="chico">Pequeña</button>
+              <button type="button" class="chip" data-valor="normal">Normal</button>
+              <button type="button" class="chip" data-valor="grande">Grande</button>
+              <button type="button" class="chip" data-valor="enorme">Muy grande</button>
+            </div>
+          </div>
+
+          <div class="campo-apariencia">
+            <span>Color de las letras <small class="msg-inline">(Automático = el del tema)</small></span>
+            <div class="chips-color" id="cajaColorTexto"></div>
+          </div>
+
+          <div class="campo-apariencia">
+            <span>Tamaño de los iconos</span>
+            <div class="chips-seleccion" id="cajaTamanoIconos">
+              <button type="button" class="chip" data-valor="chico">Chicos</button>
+              <button type="button" class="chip" data-valor="normal">Normal</button>
+              <button type="button" class="chip" data-valor="grande">Grandes</button>
+              <button type="button" class="chip" data-valor="enorme">Muy grandes</button>
+            </div>
+          </div>
+
+          <p class="vista-previa" id="vistaPrevia">
+            <span class="ico">📰</span> Así se va a ver el texto de las noticias en tu portal.
+          </p>
+
+          <div class="fila">
+            <button type="button" id="btnResetApariencia" class="btn-secundario">↺ Volver a lo de siempre</button>
+          </div>
+          <p class="msg" id="aparienciaMsg"></p>
+        </div>
+        <div class="card-form">
           <h3><span class="ico">🏷️</span> Mis intereses (temas de mi feed)</h3>
           <p class="msg">Estos temas <b>ordenan</b> tu feed: lo que elijas aparece primero. No lo vacían.</p>
           <div id="interesesCaja" class="chips-seleccion"></div>
