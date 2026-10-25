@@ -34,8 +34,9 @@ if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('i
   db.exec("ALTER TABLE users ADD COLUMN idioma TEXT DEFAULT 'es'");
 }
 
-// Tema visual del frontend (por defecto: azul oscuro)
-const TEMAS = ['oscuro', 'claro', 'cian', 'purpura', 'celeste', 'rojo', 'verde', 'naranja'];
+// Tema visual del frontend (por defecto: azul oscuro).
+// "personalizado" usa los colores que el usuario guarda en tema_colores.
+const TEMAS = ['oscuro', 'claro', 'cian', 'purpura', 'celeste', 'rojo', 'verde', 'naranja', 'personalizado'];
 if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('tema')) {
   db.exec("ALTER TABLE users ADD COLUMN tema TEXT DEFAULT 'oscuro'");
 }
@@ -44,13 +45,18 @@ if (!db.prepare('PRAGMA table_info(users)').all().map((c) => c.name).includes('t
 // Cada preferencia se guarda como un id corto y se valida contra su lista.
 const FUENTES = ['sistema', 'humanista', 'geometrica', 'serif', 'mono', 'redondeada'];
 const TAMANOS = ['chico', 'normal', 'grande', 'enorme'];
-const COLORES_TEXTO = ['auto', 'blanco', 'negro', 'azul', 'verde', 'ambar', 'rosa', 'cian', 'violeta', 'gris'];
+const COLORES_TEXTO = ['auto', 'blanco', 'negro', 'azul', 'verde', 'ambar', 'rosa', 'cian', 'violeta', 'gris', 'personalizado'];
 const TAMANOS_ICONOS = ['chico', 'normal', 'grande', 'enorme'];
+// Aros de los estados de las noticias (burbujas de fuentes y tarjetas)
+const AROS = ['instagram', 'sunset', 'oceano', 'bosque', 'neon', 'oro', 'rubi', 'lavanda', 'menta', 'mono', 'fuego', 'hielo'];
 const COLUMNAS_APARIENCIA = [
   ['fuente', 'sistema'],
   ['tamano_texto', 'normal'],
   ['color_texto', 'auto'],
-  ['tamano_iconos', 'normal']
+  ['tamano_iconos', 'normal'],
+  ['aro', 'instagram'],
+  ['tema_colores', '{}'],
+  ['color_texto_hex', '']
 ];
 {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
@@ -59,6 +65,22 @@ const COLUMNAS_APARIENCIA = [
   }
 }
 const elegir = (valor, lista, porDefecto) => (lista.includes(valor) ? valor : porDefecto);
+
+// Colores personalizados: solo aceptamos #rrggbb (nada de url() ni valores raros)
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const COLOR_TEMA_DEFECTO = { fondo: '#0f1419', superficie: '#16202a', acento: '#1d9bf0', texto: '#e7e9ea' };
+function sanearTemaColores(v) {
+  const salida = { ...COLOR_TEMA_DEFECTO };
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(COLOR_TEMA_DEFECTO)) {
+      if (typeof v[k] === 'string' && HEX.test(v[k])) salida[k] = v[k].toLowerCase();
+    }
+  }
+  return salida;
+}
+function leerTemaColores(txt) {
+  try { return sanearTemaColores(JSON.parse(txt || '{}')); } catch { return { ...COLOR_TEMA_DEFECTO }; }
+}
 
 function hash(p) {
   const s = crypto.randomBytes(16).toString('hex');
@@ -78,7 +100,10 @@ function publicUser(u) {
     fuente: u.fuente || 'sistema',
     tamanoTexto: u.tamano_texto || 'normal',
     colorTexto: u.color_texto || 'auto',
-    tamanoIconos: u.tamano_iconos || 'normal'
+    colorTextoHex: u.color_texto_hex || '',
+    tamanoIconos: u.tamano_iconos || 'normal',
+    aro: u.aro || 'instagram',
+    temaColores: leerTemaColores(u.tema_colores)
   };
 }
 function auth(req, res, next) {
@@ -119,11 +144,14 @@ app.get('/me', auth, (req, res) => {
 });
 
 app.put('/me', auth, (req, res) => {
-  const { nombre, intereses, idioma, tema, fuente, tamanoTexto, colorTexto, tamanoIconos } = req.body || {};
+  const { nombre, intereses, idioma, tema, fuente, tamanoTexto, colorTexto, colorTextoHex,
+    tamanoIconos, aro, temaColores } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+  const hexValido = (v, actual) => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : (v === '' ? '' : actual));
   db.prepare(`UPDATE users SET nombre=?, intereses=?, idioma=?, tema=?,
-              fuente=?, tamano_texto=?, color_texto=?, tamano_iconos=? WHERE id=?`).run(
+              fuente=?, tamano_texto=?, color_texto=?, color_texto_hex=?, tamano_iconos=?,
+              aro=?, tema_colores=? WHERE id=?`).run(
     nombre !== undefined ? String(nombre) : u.nombre,
     intereses !== undefined ? JSON.stringify(intereses) : u.intereses,
     idioma !== undefined ? (['es', 'en'].includes(idioma) ? idioma : 'es') : (u.idioma || 'es'),
@@ -131,7 +159,10 @@ app.put('/me', auth, (req, res) => {
     fuente !== undefined ? elegir(fuente, FUENTES, 'sistema') : (u.fuente || 'sistema'),
     tamanoTexto !== undefined ? elegir(tamanoTexto, TAMANOS, 'normal') : (u.tamano_texto || 'normal'),
     colorTexto !== undefined ? elegir(colorTexto, COLORES_TEXTO, 'auto') : (u.color_texto || 'auto'),
+    hexValido(colorTextoHex, u.color_texto_hex || ''),
     tamanoIconos !== undefined ? elegir(tamanoIconos, TAMANOS_ICONOS, 'normal') : (u.tamano_iconos || 'normal'),
+    aro !== undefined ? elegir(aro, AROS, 'instagram') : (u.aro || 'instagram'),
+    temaColores !== undefined ? JSON.stringify(sanearTemaColores(temaColores)) : (u.tema_colores || '{}'),
     u.id
   );
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(u.id)));

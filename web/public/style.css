@@ -34,6 +34,12 @@
   --fuente: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --escala: 1;          /* tamaño de la letra (lo cambia el perfil) */
   --icono-factor: 1;    /* tamaño de los iconos (lo cambia el perfil) */
+
+  /* Aros de los estados de las noticias (perfil → "Aros de las noticias").
+     El tema por defecto es el degradado tipo Instagram. */
+  --aro-a: #f09433;
+  --aro-b: #dc2743;
+  --aro-c: #bc1888;
 }
 
 /* La escala se aplica al <html> para que TODOS los rem crezcan juntos */
@@ -74,6 +80,44 @@ body[data-tema="rojo"]    { --accent:#ef4444; --accent-hover:#dc2626; --accent-s
 body[data-tema="verde"]   { --accent:#22c55e; --accent-hover:#16a34a; --accent-soft:#4ade80; --accent-dim:#0f3d24; --accent-faint:#0a2b19; --accent-glow:#22c55e33; }
 body[data-tema="naranja"] { --accent:#f97316; --accent-hover:#ea580c; --accent-soft:#fb923c; --accent-dim:#4a2a0f; --accent-faint:#331d0a; --accent-glow:#f9731633; }
 
+/* Tema PERSONALIZADO: los colores llegan como variables inline (--tema-*)
+   desde el perfil. Nunca pisamos --text con inline para que el color de letra
+   elegido en "Texto e iconos" siga mandando. */
+body[data-tema="personalizado"] {
+  --bg: var(--tema-bg, #0f1419);
+  --surface: var(--tema-surface, #16202a);
+  --surface-2: var(--tema-surface-2, #1e2c3a);
+  --surface-3: var(--tema-surface-3, #27374a);
+  --border: var(--tema-border, #2f3336);
+  --text: var(--tema-text, #e7e9ea);
+  --text-dim: var(--tema-text-dim, #c7cdd4);
+  --muted: var(--tema-muted, #8b98a5);
+  --accent: var(--tema-accent, #1d9bf0);
+  --accent-hover: var(--tema-accent-hover, #1a8cd8);
+  --accent-soft: var(--tema-accent-soft, #4ea1f0);
+  --accent-dim: var(--tema-accent-dim, #1d3a55);
+  --accent-faint: var(--tema-accent-faint, #12202e);
+  --accent-glow: var(--tema-accent-glow, #1d9bf033);
+}
+
+/* =====================================================================
+   AROS DE LOS ESTADOS DE LAS NOTICIAS
+   Se eligen en el perfil y se aplican a las burbujas de fuentes y al aro
+   de estado de cada tarjeta. 12 combinaciones + el degradado de siempre.
+   ===================================================================== */
+body[data-aro="instagram"] { --aro-a:#f09433; --aro-b:#dc2743; --aro-c:#bc1888; }
+body[data-aro="sunset"]    { --aro-a:#ffb347; --aro-b:#ff5e62; --aro-c:#c026d3; }
+body[data-aro="oceano"]    { --aro-a:#22d3ee; --aro-b:#3b82f6; --aro-c:#6366f1; }
+body[data-aro="bosque"]    { --aro-a:#a3e635; --aro-b:#22c55e; --aro-c:#0d9488; }
+body[data-aro="neon"]      { --aro-a:#22d3ee; --aro-b:#a855f7; --aro-c:#f472b6; }
+body[data-aro="oro"]       { --aro-a:#fde68a; --aro-b:#f59e0b; --aro-c:#b45309; }
+body[data-aro="rubi"]      { --aro-a:#fca5a5; --aro-b:#ef4444; --aro-c:#9f1239; }
+body[data-aro="lavanda"]   { --aro-a:#c4b5fd; --aro-b:#8b5cf6; --aro-c:#6d28d9; }
+body[data-aro="menta"]     { --aro-a:#99f6e4; --aro-b:#2dd4bf; --aro-c:#0f766e; }
+body[data-aro="mono"]      { --aro-a:#cbd5e1; --aro-b:#94a3b8; --aro-c:#64748b; }
+body[data-aro="fuego"]     { --aro-a:#fbbf24; --aro-b:#f97316; --aro-c:#dc2626; }
+body[data-aro="hielo"]     { --aro-a:#e0f2fe; --aro-b:#7dd3fc; --aro-c:#2563eb; }
+
 /* =====================================================================
    APARIENCIA DEL TEXTO E ICONOS  (perfil → "Texto e iconos")
    Se aplica con atributos en <body>: data-fuente / data-color / data-iconos,
@@ -98,6 +142,10 @@ body[data-color="rosa"]    { --text: #f472b6; --text-dim: #fbb6d8; }
 body[data-color="cian"]    { --text: #22d3ee; --text-dim: #a5eef7; }
 body[data-color="violeta"] { --text: #c084fc; --text-dim: #e0c8ff; }
 body[data-color="gris"]    { --text: #b9c2cc; --text-dim: #d5dbe2; }
+body[data-color="personalizado"] {
+  --text: var(--texto-personalizado, #e7e9ea);
+  --text-dim: var(--texto-personalizado-dim, #c7cdd4);
+}
 
 /* Tamaño de los iconos */
 body[data-iconos="chico"]  { --icono-factor: .85; }
@@ -186,7 +234,7 @@ body.modal-abierto { overflow: hidden; }
 .burbuja { text-align: center; cursor: pointer; min-width: 74px; }
 .burbuja .anillo {
   width: 62px; height: 62px; border-radius: 50%; padding: 3px;
-  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  background: linear-gradient(45deg, var(--aro-a), var(--aro-b), var(--aro-c));
   display: flex; align-items: center; justify-content: center;
 }
 .burbuja .anillo span {
@@ -386,6 +434,102 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 }
 #btnResetApariencia { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
 #btnResetApariencia:hover { border-color: var(--accent); }
+
+/* Aros: selector de paletas y aro de estado de cada noticia */
+.chips-aro { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip-aro {
+  width: 56px; height: 56px; border-radius: 50%; cursor: pointer; padding: 0;
+  background: var(--surface-2); border: 2px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color .15s, transform .1s;
+}
+.chip-aro i {
+  width: 42px; height: 42px; border-radius: 50%; display: block; flex: none;
+  background: linear-gradient(45deg, var(--aro-a), var(--aro-b), var(--aro-c));
+  position: relative;
+}
+.chip-aro i::after {
+  content: ''; position: absolute; inset: 7px; border-radius: 50%;
+  background: var(--surface);
+}
+.chip-aro:hover { transform: translateY(-2px); }
+.chip-aro.activo { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+/* Los chips y muestras NO son botones de acción: recuperan su propio estilo
+   (el selector general ".card-form button" tiene más especificidad). */
+.card-form .chip {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--muted);
+  padding: 8px 15px;
+}
+.card-form .chip:hover { border-color: var(--accent); color: var(--text); }
+.card-form .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.card-form .swatch {
+  background: var(--surface-2); border: 2px solid var(--border); color: var(--text);
+  padding: 14px 18px;
+}
+.card-form .swatch:hover { border-color: var(--accent); }
+.card-form .swatch.activo { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.card-form .chip-color {
+  background: var(--surface-2); border: 2px solid var(--border); color: var(--text);
+  padding: 0;
+}
+.card-form .chip-color.auto { padding: 0 12px; }
+.card-form .chip-color:hover { border-color: var(--accent); }
+.card-form .chip-color.activo { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.card-form .chip-aro {
+  background: var(--surface-2); border: 2px solid var(--border); padding: 0;
+}
+.card-form .chip-aro:hover { border-color: var(--accent); }
+.card-form .chip-aro.activo { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.estado-aro {
+  width: 15px; height: 15px; flex: none; border-radius: 50%; padding: 2.5px;
+  background: linear-gradient(135deg, var(--aro-a), var(--aro-b), var(--aro-c));
+  display: inline-flex;
+}
+.estado-aro::after {
+  content: ''; width: 100%; height: 100%; border-radius: 50%;
+  background: var(--surface); display: block;
+}
+.card-noticia.leido .estado-aro { opacity: .45; }
+.burbuja.pausada .anillo { background: var(--surface-3); }
+
+/* Tema personalizado: 4 colores a elección */
+.tema-propio {
+  margin-top: 18px; padding: 16px; border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--border);
+}
+.tema-propio h4 { font-size: .92rem; margin-bottom: 4px; }
+.tema-propio .msg { margin-top: 0; margin-bottom: 14px; }
+.tema-propio .rejilla-colores {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px;
+}
+.tema-propio label {
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase;
+}
+.tema-propio input[type="color"] {
+  width: 100%; height: 44px; padding: 4px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+}
+.tema-propio .fila { margin-top: 16px; }
+
+/* Color de letra personalizado: aro arcoíris con "Aa" legible */
+.chip-color.personalizado {
+  position: relative; overflow: hidden; border-color: transparent;
+  background: linear-gradient(135deg, #ff5e62, #fbbf24, #4ade80, #22d3ee, #a855f7);
+  padding: 3px;
+}
+.chip-color.personalizado > span {
+  width: 100%; height: 100%; border-radius: 6px;
+  background: var(--surface-2); color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .82rem; font-weight: 700;
+}
+.chip-color.personalizado input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; border: 0; padding: 0;
+}
+.chip-color.personalizado.activo { border-color: var(--accent); }
 
 /* PANEL */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -684,4 +828,121 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   .nav { overflow-x: auto; padding: 8px 12px; }
   .nav .tab { white-space: nowrap; }
   main { padding: 12px; }
+}
+
+/* =====================================================================
+   PULIDO DE ESPACIADO Y ORGANIZACIÓN
+   Todo un poco más aireado: tarjetas, campos, botones, iconos y textos.
+   ===================================================================== */
+main { padding: 26px 22px 56px; }
+.vista > * + * { margin-top: 18px; }
+
+/* Tarjetas y títulos de sección */
+.card-form { padding: 24px; margin-bottom: 18px; }
+.card-form h3,
+.vista > h3 {
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.card-form h3 + .msg,
+.vista > h3 + .msg { margin-top: 0; }
+.msg { margin-top: 10px; line-height: 1.55; }
+.msg-inline { margin-left: 4px; }
+
+/* Formularios: campos y botones con aire */
+.fila { gap: 10px; align-items: center; }
+.fila input { min-width: 200px; }
+.card-form input[type="text"],
+.card-form input[type="url"],
+.card-form input[type="email"],
+.card-form input[type="password"] { padding: 12px 14px; }
+.card-form select,
+#iaProveedor, #iaModelo, #iaBaseUrl { padding: 11px 13px; }
+#formAuth { gap: 12px; }
+#formAuth input { padding: 12px 14px; }
+#formAuth button, .card-form button, .barra-feed button { padding: 12px 18px; }
+.auth-box { padding: 36px 32px; }
+.tabs-login { gap: 10px; margin-bottom: 20px; }
+
+/* Topbar y navegación */
+.topbar { gap: 18px; padding: 12px 22px; }
+.usuario { gap: 14px; }
+.perfil-top { gap: 10px; padding: 5px 16px 5px 6px; }
+.tema-picker { padding: 5px 9px 5px 11px; }
+.buscador input { padding: 10px 16px; }
+.nav { gap: 8px; padding: 10px 22px; }
+.nav .tab { gap: 10px; padding: 9px 16px 9px 10px; }
+
+/* Burbujas de fuentes */
+.burbujas { gap: 18px; padding: 16px 22px; }
+.burbuja small { margin-top: 7px; }
+
+/* Noticias, archivo y recortes */
+.barra-feed { gap: 12px; margin-bottom: 14px; }
+.barra-feed select { padding: 11px 13px; }
+.lista-cards { gap: 16px; }
+.card-noticia { padding: 18px 20px; }
+.card-noticia.destacada { padding: 24px 26px; }
+.card-noticia .cabecera { gap: 10px; margin-bottom: 10px; }
+.card-noticia h4 { margin-bottom: 10px; }
+.card-noticia .extracto { margin-bottom: 12px; line-height: 1.55; }
+.card-noticia .media { margin: -2px 0 14px; }
+.etiquetas { gap: 8px; margin-bottom: 12px; }
+.acciones { gap: 12px; margin-top: 4px; }
+.acciones button,
+.acciones a { padding: 10px 18px; }
+.digest { padding: 20px; margin-bottom: 18px; }
+.prioridades-panel { margin-bottom: 16px; }
+.prioridades-panel summary { padding: 14px 18px; }
+.prioridades-lista { padding: 14px 18px; gap: 12px; }
+.portada-aviso { padding: 16px 20px; gap: 14px; margin-bottom: 18px; }
+
+/* Fuentes y panel */
+.fuente-item { padding: 15px 17px; gap: 14px; }
+.fuente-item .info strong { margin-bottom: 3px; }
+.stats { gap: 14px; margin-bottom: 18px; }
+.stat { padding: 18px 16px; }
+
+/* Perfil */
+.perfil-fila { gap: 24px; }
+.perfil-fila > div { gap: 11px; }
+.perfil-fila input[type="text"] { min-width: 240px; }
+.chips-seleccion { gap: 10px; }
+.chip { padding: 8px 15px; }
+.chips-tema { gap: 14px; }
+.swatch { padding: 14px 18px; min-width: 104px; }
+.chips-color { gap: 10px; }
+.chip-color { width: 48px; height: 42px; }
+.campo-apariencia { gap: 10px; margin-top: 22px; }
+.vista-previa { margin: 22px 0 0; padding: 16px 18px; line-height: 1.6; }
+#v-perfil .fila { margin-top: 18px; }
+#btnResetApariencia { padding: 11px 20px; }
+#aparienciaMsg:empty { margin-top: 0; }
+
+/* IA y modal */
+.ia-motor { gap: 12px; margin-top: 12px; }
+.ia-op { padding: 14px; gap: 12px; }
+.ia-check { padding: 12px 14px; }
+.ia-tarea { gap: 8px; margin-bottom: 16px; }
+.ia-sub { margin: 22px 0 8px; }
+.ia-rec { padding: 12px 14px; gap: 14px; }
+.modal-caja { padding: 30px 30px 0; }
+.modal-caja h2 { margin: 8px 0 12px; }
+.modal-caja .meta { margin-bottom: 16px; }
+.modal-caja .cuerpo { line-height: 1.7; }
+.acciones-barra { margin: 18px -30px 0; padding: 10px 30px 16px; gap: 8px; }
+.toast { padding: 13px 24px; }
+.busqueda-chip { padding: 4px 7px 4px 13px; }
+
+/* Pantallas chicas: menos padding, pero sin volver a pegar todo */
+@media (max-width: 760px) {
+  main { padding: 16px 14px 40px; }
+  .card-form { padding: 18px 16px; }
+  .nav { gap: 6px; padding: 9px 12px; }
+  .burbujas { gap: 14px; padding: 14px; }
+  .card-noticia, .card-noticia.destacada { padding: 16px; }
+  .acciones button, .acciones a { padding: 10px 14px; }
+  .perfil-fila { gap: 16px; }
+  .perfil-fila input[type="text"] { min-width: 0; width: 100%; }
+  .tema-propio { padding: 14px; }
 }

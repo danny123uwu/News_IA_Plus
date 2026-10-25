@@ -28,10 +28,111 @@ const TEMAS = [
   { id: 'rojo',    nombre: 'Rojo',    puntos: ['#0f1419', '#16202a', '#ef4444'] },
   { id: 'verde',   nombre: 'Verde',   puntos: ['#0f1419', '#16202a', '#22c55e'] },
   { id: 'naranja', nombre: 'Naranja', puntos: ['#0f1419', '#16202a', '#f97316'] },
+  { id: 'personalizado', nombre: 'Personalizado', puntos: ['#0f1419', '#16202a', '#1d9bf0', '#e7e9ea'] },
 ];
+
+// ---------- COLORES: utilidades para el tema personalizado ----------
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const TEMA_COLORES_DEFECTO = { fondo: '#0f1419', superficie: '#16202a', acento: '#1d9bf0', texto: '#e7e9ea' };
+
+function hexRgb(h) {
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+function rgbHex(r, g, b) {
+  const c = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+/** Mezcla dos colores: k=0 devuelve a, k=1 devuelve b. */
+function mezclar(a, b, k) {
+  if (!HEX.test(a) || !HEX.test(b)) return a;
+  const [r1, g1, b1] = hexRgb(a);
+  const [r2, g2, b2] = hexRgb(b);
+  return rgbHex(r1 + (r2 - r1) * k, g1 + (g2 - g1) * k, b1 + (b2 - b1) * k);
+}
+function luminancia(h) {
+  const [r, g, b] = hexRgb(h).map((v) => v / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function sanearColores(v) {
+  const salida = { ...TEMA_COLORES_DEFECTO };
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(TEMA_COLORES_DEFECTO)) {
+      if (typeof v[k] === 'string' && HEX.test(v[k])) salida[k] = v[k].toLowerCase();
+    }
+  }
+  return salida;
+}
+let temaColores = TEMA_COLORES_DEFECTO;
+try { temaColores = sanearColores(JSON.parse(localStorage.getItem('temaColores') || '{}')); } catch {}
+
+const VARS_TEMA = [
+  '--tema-bg', '--tema-surface', '--tema-surface-2', '--tema-surface-3', '--tema-border',
+  '--tema-text', '--tema-text-dim', '--tema-muted', '--tema-accent', '--tema-accent-hover',
+  '--tema-accent-soft', '--tema-accent-dim', '--tema-accent-faint', '--tema-accent-glow'
+];
+
+function aplicarTemaColores() {
+  const c = temaColores;
+  const claro = luminancia(c.fondo) > 0.5;
+  const vars = {
+    '--tema-bg': c.fondo,
+    '--tema-surface': c.superficie,
+    '--tema-surface-2': claro ? mezclar(c.superficie, '#000000', .05) : mezclar(c.superficie, '#ffffff', .07),
+    '--tema-surface-3': claro ? mezclar(c.superficie, '#000000', .10) : mezclar(c.superficie, '#ffffff', .14),
+    '--tema-border': mezclar(c.superficie, c.texto, .22),
+    '--tema-text': c.texto,
+    '--tema-text-dim': mezclar(c.texto, c.fondo, .20),
+    '--tema-muted': mezclar(c.texto, c.fondo, .45),
+    '--tema-accent': c.acento,
+    '--tema-accent-hover': claro ? mezclar(c.acento, '#000000', .12) : mezclar(c.acento, '#ffffff', .12),
+    '--tema-accent-soft': claro ? mezclar(c.acento, '#000000', .10) : mezclar(c.acento, '#ffffff', .25),
+    '--tema-accent-dim': mezclar(c.acento, c.fondo, .72),
+    '--tema-accent-faint': mezclar(c.acento, c.fondo, .86),
+    '--tema-accent-glow': c.acento + '33'
+  };
+  for (const [k, v] of Object.entries(vars)) document.body.style.setProperty(k, v);
+}
+function limpiarTemaColores() {
+  for (const k of VARS_TEMA) document.body.style.removeProperty(k);
+}
+
+function pintarTemaColores() {
+  const pares = [
+    ['temaColorFondo', 'fondo'],
+    ['temaColorSuperficie', 'superficie'],
+    ['temaColorAcento', 'acento'],
+    ['temaColorTexto', 'texto']
+  ];
+  for (const [id, clave] of pares) {
+    const inp = $(id);
+    if (inp) inp.value = temaColores[clave];
+  }
+}
+
+function guardarTemaColores(guardar) {
+  localStorage.setItem('temaColores', JSON.stringify(temaColores));
+  pintarTemaColores();
+  if (temaActual === 'personalizado') {
+    aplicarTemaColores();
+    pintarTemas();
+  }
+  if (guardar && yo) {
+    api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ tema: 'personalizado', temaColores }) })
+      .then((u) => {
+        yo = u;
+        if ($('temaPropioMsg')) $('temaPropioMsg').textContent = 'Tu tema personalizado quedó guardado ✓';
+        if ($('temaMsg')) $('temaMsg').textContent = 'Tema Personalizado activo ✓';
+      })
+      .catch((e) => {
+        if ($('temaPropioMsg')) $('temaPropioMsg').textContent = '⚠️ No se pudo guardar: ' + e.message;
+      });
+  }
+}
+
 let temaActual = localStorage.getItem('tema') || 'oscuro';
 if (!TEMAS.some((t) => t.id === temaActual)) temaActual = 'oscuro';
 document.body.dataset.tema = temaActual;
+if (temaActual === 'personalizado') aplicarTemaColores();
 
 function pintarTemas() {
   const sel = $('temaTop');
@@ -41,12 +142,16 @@ function pintarTemas() {
   }
   const caja = $('temaCaja');
   if (!caja) return;
-  caja.innerHTML = TEMAS.map((t) =>
-    '<button type="button" class="swatch' + (t.id === temaActual ? ' activo' : '') + '" data-tema="' + t.id + '">' +
-      '<span class="puntos">' + t.puntos.map((c) => '<i style="background:' + c + '"></i>').join('') + '</span>' +
+  caja.innerHTML = TEMAS.map((t) => {
+    const puntos = t.id === 'personalizado'
+      ? [temaColores.fondo, temaColores.superficie, temaColores.acento, temaColores.texto]
+      : t.puntos;
+    return '<button type="button" class="swatch' + (t.id === temaActual ? ' activo' : '') + '" data-tema="' + t.id + '">' +
+      '<span class="puntos">' + puntos.map((c) => '<i style="background:' + c + '"></i>').join('') + '</span>' +
       '<span>' + esc(t.nombre) + '</span>' +
       '<span class="tick">' + (t.id === temaActual ? '✓ activo' : '') + '</span>' +
-    '</button>').join('');
+    '</button>';
+  }).join('');
   caja.querySelectorAll('.swatch').forEach((b) => b.addEventListener('click', () => {
     aplicarTema(b.dataset.tema, true);
     const n = (TEMAS.find((x) => x.id === b.dataset.tema) || {}).nombre || '';
@@ -58,6 +163,7 @@ function aplicarTema(tema, guardar) {
   const t = TEMAS.some((x) => x.id === tema) ? tema : 'oscuro';
   temaActual = t;
   document.body.dataset.tema = t;
+  if (t === 'personalizado') aplicarTemaColores(); else limpiarTemaColores();
   localStorage.setItem('tema', t);
   pintarTemas();
   if (guardar && yo) {
@@ -66,6 +172,29 @@ function aplicarTema(tema, guardar) {
       .catch((e) => { if ($('temaMsg')) $('temaMsg').textContent = '⚠️ No se pudo guardar: ' + e.message; });
   }
 }
+
+// Selectores de color del tema personalizado (aplican en vivo)
+[['temaColorFondo', 'fondo'], ['temaColorSuperficie', 'superficie'],
+ ['temaColorAcento', 'acento'], ['temaColorTexto', 'texto']].forEach(([id, clave]) => {
+  const inp = $(id);
+  if (!inp) return;
+  inp.addEventListener('input', () => {
+    temaColores[clave] = inp.value;
+    if (temaActual === 'personalizado') guardarTemaColores(false);
+    else pintarTemas();
+  });
+});
+if ($('btnGuardarTemaPropio')) {
+  $('btnGuardarTemaPropio').addEventListener('click', () => {
+    temaActual = 'personalizado';
+    document.body.dataset.tema = 'personalizado';
+    aplicarTemaColores();
+    localStorage.setItem('tema', 'personalizado');
+    guardarTemaColores(true);
+    toast('Tema personalizado aplicado 🎨');
+  });
+}
+pintarTemaColores();
 
 // ---------- APARIENCIA: letra, tamaño, color del texto y tamaño de iconos ----------
 // Igual que el tema: se guarda en tu cuenta (y en localStorage para que se vea
@@ -81,7 +210,7 @@ const COLORES_TEXTO = [
   { id: 'auto' }, { id: 'blanco', hex: '#ffffff' }, { id: 'negro', hex: '#0b0f14' },
   { id: 'azul', hex: '#6cb8ff' }, { id: 'verde', hex: '#4ade80' }, { id: 'ambar', hex: '#fbbf24' },
   { id: 'rosa', hex: '#f472b6' }, { id: 'cian', hex: '#22d3ee' }, { id: 'violeta', hex: '#c084fc' },
-  { id: 'gris', hex: '#b9c2cc' }
+  { id: 'gris', hex: '#b9c2cc' }, { id: 'personalizado' }
 ];
 const TAMANOS_ICONOS = [
   { id: 'chico',  factor: 0.85 },
@@ -90,7 +219,7 @@ const TAMANOS_ICONOS = [
   { id: 'enorme', factor: 1.45 }
 ];
 
-const APARIENCIA_DEFECTO = { fuente: 'sistema', tamanoTexto: 'normal', colorTexto: 'auto', tamanoIconos: 'normal' };
+const APARIENCIA_DEFECTO = { fuente: 'sistema', tamanoTexto: 'normal', colorTexto: 'auto', colorTextoHex: '#e7e9ea', tamanoIconos: 'normal' };
 let apariencia = Object.assign({}, APARIENCIA_DEFECTO);
 try {
   const guardada = JSON.parse(localStorage.getItem('apariencia') || '{}');
@@ -112,12 +241,25 @@ function aplicarApariencia(guardar) {
   const tamano = TAMANOS_TEXTO.find((t) => t.id === apariencia.tamanoTexto) || TAMANOS_TEXTO[1];
   const color = COLORES_TEXTO.some((c) => c.id === apariencia.colorTexto) ? apariencia.colorTexto : 'auto';
   const iconos = TAMANOS_ICONOS.find((i) => i.id === apariencia.tamanoIconos) || TAMANOS_ICONOS[1];
-  apariencia = { fuente, tamanoTexto: tamano.id, colorTexto: color, tamanoIconos: iconos.id };
+  const hex = HEX.test(apariencia.colorTextoHex || '') ? apariencia.colorTextoHex.toLowerCase() : APARIENCIA_DEFECTO.colorTextoHex;
+  apariencia = { fuente, tamanoTexto: tamano.id, colorTexto: color, colorTextoHex: hex, tamanoIconos: iconos.id };
 
   document.body.dataset.fuente = fuente;
   document.body.dataset.color = color;
   document.body.dataset.iconos = iconos.id;
   document.documentElement.style.setProperty('--escala', String(tamano.escala));
+
+  // Color de letra personalizado: se calcula un "dim" mezclado con el fondo
+  // para que los textos secundarios mantengan contraste.
+  if (color === 'personalizado') {
+    const fondo = (getComputedStyle(document.body).getPropertyValue('--bg') || '#0f1419').trim();
+    document.body.style.setProperty('--texto-personalizado', hex);
+    document.body.style.setProperty('--texto-personalizado-dim', mezclar(hex, HEX.test(fondo) ? fondo : '#0f1419', .28));
+  } else {
+    document.body.style.removeProperty('--texto-personalizado');
+    document.body.style.removeProperty('--texto-personalizado-dim');
+  }
+
   localStorage.setItem('apariencia', JSON.stringify(apariencia));
   pintarApariencia();
   // La barra de navegación es sticky debajo del topbar: si cambia el tamaño de
@@ -148,15 +290,32 @@ function pintarApariencia() {
 
   const cajaColor = $('cajaColorTexto');
   if (cajaColor && !cajaColor.childElementCount) {
-    cajaColor.innerHTML = COLORES_TEXTO.map((c) => c.id === 'auto'
-      ? '<button type="button" class="chip-color auto" data-color="auto" title="Usar el color del tema">Auto</button>'
-      : '<button type="button" class="chip-color" data-color="' + c.id + '" style="color:' + c.hex + '" title="' + c.id + '">Aa</button>'
-    ).join('');
+    cajaColor.innerHTML = COLORES_TEXTO.map((c) => {
+      if (c.id === 'auto') {
+        return '<button type="button" class="chip-color auto" data-color="auto" title="Usar el color del tema">Auto</button>';
+      }
+      if (c.id === 'personalizado') {
+        return '<label class="chip-color personalizado" data-color="personalizado" title="Elegir un color personalizado">' +
+          '<span>Aa</span>' +
+          '<input type="color" id="colorTextoInput" value="' + apariencia.colorTextoHex + '" aria-label="Color de letra personalizado" />' +
+        '</label>';
+      }
+      return '<button type="button" class="chip-color" data-color="' + c.id + '" style="color:' + c.hex + '" title="' + c.id + '">Aa</button>';
+    }).join('');
     cajaColor.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => {
       apariencia.colorTexto = b.dataset.color;
       aplicarApariencia(true);
     }));
+    const inputColor = $('colorTextoInput');
+    if (inputColor) {
+      inputColor.addEventListener('input', () => {
+        apariencia.colorTexto = 'personalizado';
+        apariencia.colorTextoHex = inputColor.value;
+        aplicarApariencia(true);
+      });
+    }
   }
+  if ($('colorTextoInput')) $('colorTextoInput').value = apariencia.colorTextoHex;
   if (cajaColor) cajaColor.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('activo', b.dataset.color === apariencia.colorTexto));
 }
 
@@ -182,6 +341,53 @@ if ($('btnResetApariencia')) {
   });
 }
 aplicarApariencia(false);
+
+// ---------- AROS DE LOS ESTADOS DE LAS NOTICIAS ----------
+const AROS = [
+  { id: 'instagram', nombre: 'Instagram', c: ['#f09433', '#dc2743', '#bc1888'] },
+  { id: 'sunset',    nombre: 'Atardecer',  c: ['#ffb347', '#ff5e62', '#c026d3'] },
+  { id: 'oceano',    nombre: 'Océano',     c: ['#22d3ee', '#3b82f6', '#6366f1'] },
+  { id: 'bosque',    nombre: 'Bosque',     c: ['#a3e635', '#22c55e', '#0d9488'] },
+  { id: 'neon',      nombre: 'Neón',       c: ['#22d3ee', '#a855f7', '#f472b6'] },
+  { id: 'oro',       nombre: 'Oro',        c: ['#fde68a', '#f59e0b', '#b45309'] },
+  { id: 'rubi',      nombre: 'Rubí',       c: ['#fca5a5', '#ef4444', '#9f1239'] },
+  { id: 'lavanda',   nombre: 'Lavanda',    c: ['#c4b5fd', '#8b5cf6', '#6d28d9'] },
+  { id: 'menta',     nombre: 'Menta',      c: ['#99f6e4', '#2dd4bf', '#0f766e'] },
+  { id: 'mono',      nombre: 'Gris',       c: ['#cbd5e1', '#94a3b8', '#64748b'] },
+  { id: 'fuego',     nombre: 'Fuego',      c: ['#fbbf24', '#f97316', '#dc2626'] },
+  { id: 'hielo',     nombre: 'Hielo',      c: ['#e0f2fe', '#7dd3fc', '#2563eb'] }
+];
+let aroActual = localStorage.getItem('aro') || 'instagram';
+if (!AROS.some((a) => a.id === aroActual)) aroActual = 'instagram';
+
+function aplicarAro(aro, guardar) {
+  const a = AROS.some((x) => x.id === aro) ? aro : 'instagram';
+  aroActual = a;
+  document.body.dataset.aro = a;
+  localStorage.setItem('aro', a);
+  pintarAros();
+  if (guardar && yo) {
+    api(AUTH, '/me', { method: 'PUT', body: JSON.stringify({ aro: a }) })
+      .then((u) => { yo = u; if ($('aroMsg')) $('aroMsg').textContent = 'Aros guardados en tu cuenta ✓'; })
+      .catch((e) => { if ($('aroMsg')) $('aroMsg').textContent = '⚠️ No se pudo guardar: ' + e.message; });
+  }
+}
+
+function pintarAros() {
+  const caja = $('cajaAros');
+  if (!caja) return;
+  caja.innerHTML = AROS.map((a) =>
+    '<button type="button" class="chip-aro' + (a.id === aroActual ? ' activo' : '') + '" data-aro="' + a.id + '" ' +
+      'title="' + esc(a.nombre) + '" aria-label="Aros ' + esc(a.nombre) + '" ' +
+      'style="--aro-a:' + a.c[0] + ';--aro-b:' + a.c[1] + ';--aro-c:' + a.c[2] + '"><i aria-hidden="true"></i></button>'
+  ).join('');
+  caja.querySelectorAll('[data-aro]').forEach((b) => b.addEventListener('click', () => {
+    aplicarAro(b.dataset.aro, true);
+    const n = (AROS.find((x) => x.id === b.dataset.aro) || {}).nombre || '';
+    toast('Aros ' + n + ' aplicados 🌈');
+  }));
+}
+aplicarAro(aroActual, false);
 
 function tagsDe(a) {
   if (Array.isArray(a.etiquetas)) return a.etiquetas;
@@ -304,15 +510,23 @@ async function entrar(datos) {
     }
     $('perfilNombre').value = yo.nombre;
     $('perfilIdioma').value = yo.idioma || 'es';
+    // Tema y colores personalizados de la cuenta
+    if (yo.temaColores) {
+      temaColores = sanearColores(yo.temaColores);
+      localStorage.setItem('temaColores', JSON.stringify(temaColores));
+      pintarTemaColores();
+    }
     aplicarTema(yo.tema || temaActual, false); // el tema de tu cuenta manda
     // La apariencia del texto/iconos también manda desde la cuenta
     apariencia = {
       fuente: yo.fuente || apariencia.fuente,
       tamanoTexto: yo.tamanoTexto || apariencia.tamanoTexto,
       colorTexto: yo.colorTexto || apariencia.colorTexto,
+      colorTextoHex: yo.colorTextoHex || apariencia.colorTextoHex,
       tamanoIconos: yo.tamanoIconos || apariencia.tamanoIconos
     };
     aplicarApariencia(false);
+    aplicarAro(yo.aro || aroActual, false);
     pintarTemas();
     await Promise.all([cargarFuentes(), cargarTaxonomia(), cargarFeed(), cargarPanel()]);
     cargarIA().catch(() => {});
@@ -602,7 +816,7 @@ function tituloDe(a) { return miIdioma() === 'en' ? a.titulo : (a.titulo_es || a
 
 function cardNoticia(a, destacada) {
   const div = document.createElement('div');
-  div.className = 'card-noticia' + (destacada ? ' destacada' : '');
+  div.className = 'card-noticia' + (destacada ? ' destacada' : '') + (a.leido ? ' leido' : '');
   div.dataset.id = a.id;
   const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '';
   const tags = tagsDe(a);
@@ -612,6 +826,7 @@ function cardNoticia(a, destacada) {
   div.innerHTML = `
     ${a.imagen ? `<div class="media"><img src="${esc(a.imagen)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.style.display='none'">${a.video ? '<span class="play">▶ video</span>' : ''}</div>` : ''}
     <div class="cabecera">
+      <span class="estado-aro" title="${a.leido ? 'Noticia leída' : 'Noticia sin leer'}" aria-hidden="true"></span>
       <span class="pastilla ${a.prioridad >= 4 ? 'prio' : ''}">📡 ${esc(a.fuente)}
         <button class="prio-btn" data-a="subir" title="Subir prioridad de ${esc(a.fuente)}">▲</button><button class="prio-btn" data-a="bajar" title="Bajar prioridad de ${esc(a.fuente)}">▼</button>
         <span class="prio-num">${a.prioridad}/5</span>
@@ -859,6 +1074,11 @@ function abrirArticulo(a) {
 
 function marcarCardLeida(id) {
   const el = document.querySelector('.card-noticia[data-id="' + id + '"]');
+  if (el) {
+    el.classList.add('leido'); // el aro se atenúa
+    const aro = el.querySelector('.estado-aro');
+    if (aro) aro.title = 'Noticia leída';
+  }
   if (el && !el.querySelector('.leido-ok')) {
     const cab = el.querySelector('.cabecera');
     if (cab) {
@@ -989,8 +1209,8 @@ async function cargarArchivados() {
     ca.innerHTML = arts.articulos.length ? '' : '<p class="vacio">Sin noticias archivadas aún.</p>';
     arts.articulos.forEach((a) => {
       const div = document.createElement('div');
-      div.className = 'card-noticia';
-      div.innerHTML = `<div class="cabecera"><span class="pastilla">📡 ${esc(a.fuente)}</span></div>
+      div.className = 'card-noticia leido';
+      div.innerHTML = `<div class="cabecera"><span class="estado-aro" title="Noticia archivada" aria-hidden="true"></span><span class="pastilla">📡 ${esc(a.fuente)}</span></div>
         <h4>${esc(a.titulo)}</h4><div class="acciones">
         <button data-a="quitar">Sacar del archivo</button>
         <a href="${esc(a.link)}" target="_blank" rel="noopener">Fuente ↗</a></div>`;

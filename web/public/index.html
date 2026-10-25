@@ -62,9 +62,9 @@
       <button class="tab active" data-vista="feed"><span class="ico"><i class="ico-mask ico-noticias" aria-hidden="true"></i></span> Para Ti</button>
       <button class="tab" data-vista="fuentes"><span class="ico"><img class="ico-img" src="img/senal-satelital.png" alt="" /></span> Mis fuentes</button>
       <button class="tab" data-vista="archivados"><span class="ico">📁</span> Archivados</button>
-      <button class="tab" data-vista="perfil"><span class="ico"><img class="ico-img" src="img/usuario.png" alt="" /></span> Mi perfil</button>
       <button class="tab" data-vista="panel"><span class="ico"><img class="ico-img" src="img/panel-de-control.png" alt="" /></span> Panel</button>
       <button class="tab" data-vista="ia"><span class="ico"><img class="ico-img" src="img/configuracion-de-ia.png" alt="" /></span> IA</button>
+      <button class="tab" data-vista="perfil"><span class="ico"><img class="ico-img" src="img/usuario.png" alt="" /></span> Mi perfil</button>
     </nav>
 
     <main>
@@ -141,6 +141,21 @@
           <h3><span class="ico">🎨</span> Tema de color</h3>
           <p class="msg">Elegí una combinación de colores. Se guarda en tu cuenta y se aplica en todos tus dispositivos.</p>
           <div id="temaCaja" class="chips-tema"></div>
+
+          <div class="tema-propio">
+            <h4>🎛️ Personalizado</h4>
+            <p class="msg">Armá tu propia combinación: elegí los 4 colores y guardala. Queda como un tema más de la lista.</p>
+            <div class="rejilla-colores">
+              <label>Fondo <input type="color" id="temaColorFondo" value="#0f1419" /></label>
+              <label>Tarjetas <input type="color" id="temaColorSuperficie" value="#16202a" /></label>
+              <label>Acento <input type="color" id="temaColorAcento" value="#1d9bf0" /></label>
+              <label>Texto <input type="color" id="temaColorTexto" value="#e7e9ea" /></label>
+            </div>
+            <div class="fila">
+              <button type="button" id="btnGuardarTemaPropio">💾 Aplicar y guardar mi tema</button>
+            </div>
+            <p class="msg" id="temaPropioMsg"></p>
+          </div>
           <p class="msg" id="temaMsg"></p>
         </div>
         <div class="card-form">
@@ -189,9 +204,15 @@
           </p>
 
           <div class="fila">
-            <button type="button" id="btnResetApariencia" class="btn-secundario">↺ Volver a lo de siempre</button>
+            <button type="button" id="btnResetApariencia" class="btn-secundario">↺ Restablecer</button>
           </div>
           <p class="msg" id="aparienciaMsg"></p>
+        </div>
+        <div class="card-form">
+          <h3><span class="ico">🌈</span> Aros de las noticias</h3>
+          <p class="msg">Elegí el color de los aros que marcan el estado de las noticias y las fuentes. Se guarda en tu cuenta.</p>
+          <div id="cajaAros" class="chips-aro"></div>
+          <p class="msg" id="aroMsg"></p>
         </div>
         <div class="card-form">
           <h3><span class="ico">🏷️</span> Mis intereses (temas de mi feed)</h3>
