@@ -14,7 +14,7 @@ function apiLista(cfg) {
   return Boolean(cfg.api.key && (cfg.api.baseUrl || cfg.api.proveedor === 'gemini'));
 }
 
-async function generar({ prompt, system, tarea = 'resumir', cfg, prioridad = 0 }) {
+async function generar({ prompt, system, tarea = 'resumir', cfg, prioridad = 0, signal }) {
   if (!cfg) throw new Error('Falta la configuración de IA');
   let errorApi = null;
 
@@ -36,7 +36,7 @@ async function generar({ prompt, system, tarea = 'resumir', cfg, prioridad = 0 }
     const modelo = modeloPara(tarea, preferido);
     const t0 = Date.now();
     try {
-      const texto = await preguntar({ prompt, system, modelo, tarea, prioridad });
+      const texto = await preguntar({ prompt, system, modelo, tarea, prioridad, signal });
       return { texto, motor: 'ollama:' + modelo, ms: Date.now() - t0 };
     } catch (e) {
       if (errorApi) throw new Error(errorApi.message + ' | local: ' + e.message);

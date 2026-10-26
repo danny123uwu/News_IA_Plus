@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { clasificarPorReglas, recortarFrases, TAXONOMIA } = require('../services/agent/ai/rules');
+const { clasificarPorReglas, recortarFrases, TAXONOMIA, textoEnBucle } = require('../services/agent/ai/rules');
 const { recomendar, NOMBRE_MODELO, elegirAutomatico } = require('../services/agent/ai/models');
 const { esEspanol } = require('../services/agent/ai/translate');
 const { sanearBaseUrl } = require('../services/agent/config');
@@ -23,6 +23,19 @@ test('recorta por frases sin cortar palabras', () => {
 test('detecta español con acentos y palabras comunes', () => {
   assert.equal(esEspanol('El gobierno anunció una medida económica'), true);
   assert.equal(esEspanol('The government announced a new economic measure today'), false);
+});
+
+test('detecta texto en bucle (modelo repitiendo frases)', () => {
+  const normal = 'La empresa presentó su nuevo producto. ' +
+    'El dispositivo llega en noviembre con un precio de 499 euros. ' +
+    'Incluye una pantalla mejor y más autonomía que el modelo anterior.';
+  assert.equal(textoEnBucle(normal), false);
+
+  const bucle = ('Expedición 33 vendió millones de copias y llegó a Game Pass. ').repeat(20);
+  assert.equal(textoEnBucle(bucle), true);
+
+  // Textos cortos no se marcan: no hay evidencia suficiente.
+  assert.equal(textoEnBucle('Expedición 33 Expedición 33'), false);
 });
 
 test('recomienda modelos instalados y evita los que no entran en VRAM', () => {

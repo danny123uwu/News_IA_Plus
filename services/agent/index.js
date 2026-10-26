@@ -18,7 +18,7 @@ const { getConfig, setConfig, configVisible, PROVEEDORES, sanearBaseUrl } = requ
 const { listarModelos, disponible, jalarModelo, estado } = require('./ai/ollama');
 const { RECOMENDADOS, NOMBRE_MODELO, recomendar } = require('./ai/models');
 const { listarModelosApi } = require('./ai/providers');
-const { TAXONOMIA, clasificarPorReglas, resumenExtractivo, recortarFrases, PARECIA_RECHAZO } = require('./ai/rules');
+const { TAXONOMIA, clasificarPorReglas, resumenExtractivo, recortarFrases, PARECIA_RECHAZO, textoEnBucle } = require('./ai/rules');
 const { generar } = require('./ai/engine');
 const { traducirPar, traducirBloques } = require('./ai/translate');
 const prompts = require('./ai/prompts');
@@ -62,6 +62,24 @@ function avisoIA(e) {
   return 'La IA no está disponible' + (detalle ? ': ' + detalle : '') +
     '. Se muestra un resultado automático. Revisá ⚙️ IA: descargá un modelo local o configurá una API externa.';
 }
+
+// Si el navegador cierra el panel (o se va de la página), nginx corta la
+// conexión. Abortamos la inferencia para liberar CPU en vez de terminarla al
+// pedo: puede ser un minuto entero de procesador.
+function corteDeCliente(res) {
+  const ac = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) ac.abort(); });
+  return ac.signal;
+}
+
+function clienteSeFue(res, signal) {
+  return signal.aborted || res.destroyed || res.writableEnded;
+}
+
+// Un modelo chico a veces se traba repitiendo la misma frase hasta agotar los
+// tokens (sobre todo con artículos largos). Detectamos eso para no mostrar
+// basura: preferimos el resumen automático y avisamos.
+const AVISO_BUCLE = 'La IA se trabó repitiendo texto (el modelo local va justo para este artículo). Se muestra un resultado automático. Con la GPU activada o un modelo más grande suele mejorar.';
 
 const limiteGeneral = crearLimitador({
   ventanaMs: 60000, maximo: entero('RATE_AGENTE_MIN', 120, { min: 10, max: 2000 }), clave: porUsuario,
@@ -284,18 +302,24 @@ app.post('/classify-batch', auth, limiteGeneral, async (req, res) => {
 // ---------- RESUMEN / DIGEST / PREGUNTAS ----------
 app.post('/summarize', auth, limiteGeneral, limiteCaro, async (req, res) => {
   const { titulo, texto } = req.body || {};
+  const signal = corteDeCliente(res);
   let aviso = '';
   try {
     const { texto: r, motor, ms } = await generar({
       ...prompts.resumir({ titulo: recortar(titulo, 500), texto: recortar(texto, 20000) }),
       tarea: 'resumir',
-      cfg: getConfig(uidDe(req))
+      cfg: getConfig(uidDe(req)),
+      signal
     });
-    if (r) return res.json({ resumen: r, motor, ms });
-    aviso = avisoIA(new Error('la IA no devolvió texto'));
+    if (clienteSeFue(res, signal)) return;
+    if (r && !textoEnBucle(r)) return res.json({ resumen: r, motor, ms });
+    if (r) aviso = AVISO_BUCLE;
+    else aviso = avisoIA(new Error('la IA no devolvió texto'));
   } catch (e) {
+    if (clienteSeFue(res, signal)) return;
     aviso = avisoIA(e);
   }
+  if (clienteSeFue(res, signal)) return;
   res.json({ resumen: resumenExtractivo(recortar(texto, 20000)), motor: 'reglas', aviso });
 });
 
@@ -307,18 +331,23 @@ app.post('/digest', auth, limiteGeneral, limiteCaro, async (req, res) => {
     contenido: recortar(a.contenido, 800)
   }));
   if (!lista.length) return res.json({ digest: 'No hay noticias nuevas en las últimas 24 horas.' });
+  const signal = corteDeCliente(res);
   let aviso = '';
   try {
     const { texto: r, motor, ms } = await generar({
       ...prompts.digest(lista),
       tarea: 'resumir',
-      cfg: getConfig(uidDe(req))
+      cfg: getConfig(uidDe(req)),
+      signal
     });
+    if (clienteSeFue(res, signal)) return;
     if (r) return res.json({ digest: r, motor, ms });
     aviso = avisoIA(new Error('la IA no devolvió texto'));
   } catch (e) {
+    if (clienteSeFue(res, signal)) return;
     aviso = avisoIA(e);
   }
+  if (clienteSeFue(res, signal)) return;
   const resumen = lista.slice(0, 6).map((a) => '• ' + a.titulo + (a.fuente ? ' — ' + a.fuente : '')).join('\n');
   res.json({ digest: 'Lo importante de hoy:\n' + resumen, motor: 'reglas', aviso });
 });
@@ -331,20 +360,27 @@ app.post('/ask', auth, limiteGeneral, limiteCaro, async (req, res) => {
     pregunta: recortar(pregunta, 2000)
   });
   const cfg = getConfig(uidDe(req));
+  const signal = corteDeCliente(res);
   let aviso = '';
   try {
-    let { texto: r, motor, ms } = await generar({ ...p, tarea: 'resumir', cfg });
+    let { texto: r, motor, ms } = await generar({ ...p, tarea: 'resumir', cfg, signal });
+    if (clienteSeFue(res, signal)) return;
     if (r && PARECIA_RECHAZO.test(r)) {
       try {
-        const re = await generar({ ...prompts.reintentoPregunta(p.system, p.prompt), tarea: 'resumir', cfg });
+        const re = await generar({ ...prompts.reintentoPregunta(p.system, p.prompt), tarea: 'resumir', cfg, signal });
+        if (clienteSeFue(res, signal)) return;
         if (re.texto && !PARECIA_RECHAZO.test(re.texto)) { r = re.texto; motor = re.motor; ms = re.ms; }
       } catch {}
     }
-    if (r) return res.json({ respuesta: r, motor, ms });
-    aviso = avisoIA(new Error('la IA no devolvió texto'));
+    if (clienteSeFue(res, signal)) return;
+    if (r && !textoEnBucle(r)) return res.json({ respuesta: r, motor, ms });
+    if (r) aviso = AVISO_BUCLE;
+    else aviso = avisoIA(new Error('la IA no devolvió texto'));
   } catch (e) {
+    if (clienteSeFue(res, signal)) return;
     aviso = avisoIA(e);
   }
+  if (clienteSeFue(res, signal)) return;
   res.json({
     respuesta: 'La IA no está disponible en este momento. Fragmento de la noticia: ' + recortar(texto, 400),
     motor: 'reglas',

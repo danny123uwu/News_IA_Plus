@@ -23,11 +23,22 @@ function recortar(texto, max) {
 
 const PARECIA_RECHAZO = /(no puedo (proporcionar|ayudar|crear|generar|ofrecer|explicar)|lo siento,? pero|no me es posible|no está permitido|no debo|cannot (help|assist|provide|comply)|i can't|i cannot)/i;
 
+// Un modelo chico a veces se traba repitiendo la misma frase hasta agotar los
+// tokens. Detectamos eso para no mostrar basura repetida.
+function textoEnBucle(t) {
+  const s = String(t || '').trim();
+  if (s.length < 300) return false;
+  const palabras = s.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  if (palabras.length < 120) return false;
+  return (new Set(palabras).size / palabras.length) < 0.22;
+}
+
 module.exports = {
   TAXONOMIA,
   clasificarPorReglas,
   resumenExtractivo,
   recortarFrases,
   recortar,
-  PARECIA_RECHAZO
+  PARECIA_RECHAZO,
+  textoEnBucle
 };

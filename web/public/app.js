@@ -418,6 +418,8 @@ async function api(base, path, options = {}) {
   try {
     r = await fetch(base + path, Object.assign({}, options, { headers }));
   } catch (e) {
+    // Si la cancelamos nosotros (cerrar el panel, timeout) no es un fallo de red.
+    if (e && e.name === 'AbortError') throw e;
     throw new Error('No se pudo conectar con el servidor. Intenta otra vez.');
   }
   const data = await r.json().catch(() => ({}));
@@ -987,6 +989,30 @@ let iaSeq = 0;
 // ---------- PANEL LATERAL DE LA IA ----------
 // Se abre desde la derecha y flota sobre el artículo: el texto no se mueve ni
 // cambia la posición de lectura (antes la respuesta se insertaba en el flujo).
+let iaCtrl = null;      // petición en curso (para poder cancelarla)
+let iaTimer = null;     // cronómetro visible mientras genera
+let iaPorTiempo = false; // true si la canceló el límite de tiempo, no el usuario
+
+function detenerCargaIA() {
+  if (iaTimer) { clearInterval(iaTimer); iaTimer = null; }
+}
+
+function panelGenerando(titulo, extra = '') {
+  detenerCargaIA();
+  const t0 = Date.now();
+  abrirPanelIA({
+    titulo,
+    html: extra +
+      '<p class="panel-ia-cargando">Generando… <b id="iaSeg">0</b> s' +
+      '<br><small>En CPU puede tardar entre 30 y 120 segundos.</small></p>'
+  });
+  iaTimer = setInterval(() => {
+    const el = $('iaSeg');
+    if (!el) { detenerCargaIA(); return; }
+    el.textContent = String(Math.round((Date.now() - t0) / 1000));
+  }, 1000);
+}
+
 function abrirPanelIA({ titulo, motor, aviso, html }) {
   const panel = $('resultadoIA');
   if (!panel) return;
@@ -995,7 +1021,7 @@ function abrirPanelIA({ titulo, motor, aviso, html }) {
       '<span class="panel-ia-titulo">🤖 ' + esc(titulo || 'Respuesta') +
         (motor ? ' <span class="ia-motor-tag">' + esc(motor) + '</span>' : '') +
       '</span>' +
-      '<button class="panel-ia-cerrar" type="button" title="Cerrar (Esc)" aria-label="Cerrar el panel">✕</button>' +
+      '<button class="panel-ia-cerrar" type="button" title="Cerrar y cancelar (Esc)" aria-label="Cerrar el panel">✕</button>' +
     '</div>' +
     '<div class="panel-ia-cuerpo">' +
       (aviso ? '<div class="aviso-ia">⚠️ ' + esc(aviso) + '</div>' : '') +
@@ -1008,11 +1034,29 @@ function abrirPanelIA({ titulo, motor, aviso, html }) {
 }
 
 function cerrarPanelIA() {
+  // Cerrar el panel cancela la petición: así la CPU deja de trabajar en algo
+  // que el usuario ya no está esperando.
+  detenerCargaIA();
+  if (iaCtrl) { iaCtrl.abort(); iaCtrl = null; }
   const panel = $('resultadoIA');
   if (!panel) return;
   panel.classList.remove('abierto');
   panel.setAttribute('aria-hidden', 'true');
   panel.innerHTML = '';
+}
+
+// Prepara una petición nueva: cancela la anterior, arranca el cronómetro y
+// devuelve el controlador + el límite de tiempo (150 s).
+function empezarIA(titulo, extra = '') {
+  if (iaCtrl) iaCtrl.abort();
+  const ctrl = new AbortController();
+  iaCtrl = ctrl;
+  iaPorTiempo = false;
+  const limite = setTimeout(() => {
+    if (iaCtrl === ctrl) { iaPorTiempo = true; ctrl.abort(); }
+  }, 150000);
+  panelGenerando(titulo, extra);
+  return { ctrl, limite };
 }
 
 $('resultadoIA').addEventListener('click', (e) => {
@@ -1076,13 +1120,27 @@ function abrirArticulo(a) {
 
   $('mResumir').addEventListener('click', async () => {
     const mi = ++iaSeq;
-    abrirPanelIA({ titulo: 'Resumen', html: '<p class="panel-ia-cargando">Generando con el motor configurado…</p>' });
+    const { ctrl, limite } = empezarIA('Resumen');
     try {
-      const d = await api(AGENT, '/summarize', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a._textoIA || a.contenido }) });
+      const d = await api(AGENT, '/summarize', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a._textoIA || a.contenido }), signal: ctrl.signal });
       if (!iaVigente(mi)) return;
+      detenerCargaIA();
       abrirPanelIA({ titulo: 'Resumen', motor: d.motor, aviso: d.aviso, html: mdAHtml(d.resumen) });
     } catch (e) {
-      if (iaVigente(mi)) abrirPanelIA({ titulo: 'Resumen', html: '<p>❌ ' + esc(e.message) + '</p>' });
+      if (e.name === 'AbortError') {
+        if (iaPorTiempo && iaVigente(mi)) {
+          detenerCargaIA();
+          abrirPanelIA({ titulo: 'Resumen', aviso: 'La IA tardó más de 150 segundos y se canceló. Probá de nuevo o elegí un modelo más liviano.' });
+        }
+        return;
+      }
+      if (iaVigente(mi)) {
+        detenerCargaIA();
+        abrirPanelIA({ titulo: 'Resumen', html: '<p>❌ ' + esc(e.message) + '</p>' });
+      }
+    } finally {
+      clearTimeout(limite);
+      if (iaCtrl === ctrl) iaCtrl = null;
     }
   });
 
@@ -1091,13 +1149,27 @@ function abrirArticulo(a) {
     if (!p) return;
     const mi = ++iaSeq;
     const pregunta = '<p class="panel-ia-pregunta">💬 ' + esc(p) + '</p>';
-    abrirPanelIA({ titulo: 'Respuesta', html: pregunta + '<p class="panel-ia-cargando">Pensando… 🤖</p>' });
+    const { ctrl, limite } = empezarIA('Respuesta', pregunta);
     try {
-      const d = await api(AGENT, '/ask', { method: 'POST', body: JSON.stringify({ pregunta: p, titulo: a.titulo, texto: a._textoIA || a.contenido }) });
+      const d = await api(AGENT, '/ask', { method: 'POST', body: JSON.stringify({ pregunta: p, titulo: a.titulo, texto: a._textoIA || a.contenido }), signal: ctrl.signal });
       if (!iaVigente(mi)) return;
+      detenerCargaIA();
       abrirPanelIA({ titulo: 'Respuesta', motor: d.motor, aviso: d.aviso, html: pregunta + mdAHtml(d.respuesta) });
     } catch (e) {
-      if (iaVigente(mi)) abrirPanelIA({ titulo: 'Respuesta', html: pregunta + '<p>❌ ' + esc(e.message) + '</p>' });
+      if (e.name === 'AbortError') {
+        if (iaPorTiempo && iaVigente(mi)) {
+          detenerCargaIA();
+          abrirPanelIA({ titulo: 'Respuesta', aviso: 'La IA tardó más de 150 segundos y se canceló. Probá de nuevo o elegí un modelo más liviano.' });
+        }
+        return;
+      }
+      if (iaVigente(mi)) {
+        detenerCargaIA();
+        abrirPanelIA({ titulo: 'Respuesta', html: pregunta + '<p>❌ ' + esc(e.message) + '</p>' });
+      }
+    } finally {
+      clearTimeout(limite);
+      if (iaCtrl === ctrl) iaCtrl = null;
     }
   });
 

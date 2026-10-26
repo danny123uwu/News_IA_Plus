@@ -89,8 +89,10 @@ function modeloPara(tarea, preferido) {
 const pendientes = [];
 let activos = 0;
 
-function enCola(tarea, prioridad = 0) {
+function enCola(tarea, prioridad = 0, signal) {
   return new Promise((resolve, reject) => {
+    const cancelado = () => Object.assign(new Error('Petición cancelada'), { name: 'AbortError' });
+    if (signal && signal.aborted) return reject(cancelado());
     if (pendientes.length >= MAX_COLA) {
       const e = new Error('La IA local está ocupada. Probá de nuevo en unos segundos.');
       e.codigo = 'cola_llena';
@@ -103,6 +105,17 @@ function enCola(tarea, prioridad = 0) {
     let i = pendientes.length;
     while (i > 0 && (pendientes[i - 1].prioridad || 0) > prioridad) i--;
     pendientes.splice(i, 0, trabajo);
+    if (signal) {
+      // Si el usuario cierra el panel antes de que le toque el turno, se saca
+      // de la cola: no tiene sentido gastar CPU en una respuesta que ya nadie ve.
+      const alCancelar = () => {
+        const j = pendientes.indexOf(trabajo);
+        if (j >= 0) pendientes.splice(j, 1);
+        if (j >= 0) reject(cancelado());
+      };
+      signal.addEventListener('abort', alCancelar, { once: true });
+      trabajo.limpiar = () => signal.removeEventListener('abort', alCancelar);
+    }
     siguiente();
   });
 }
@@ -110,6 +123,7 @@ function enCola(tarea, prioridad = 0) {
 function siguiente() {
   while (activos < CONCURRENCIA && pendientes.length) {
     const trabajo = pendientes.shift();
+    if (trabajo.limpiar) trabajo.limpiar();
     activos++;
     Promise.resolve()
       .then(trabajo.tarea)
@@ -118,12 +132,14 @@ function siguiente() {
   }
 }
 
-async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad = 0 }) {
+async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad = 0, signal }) {
   const elegido = modeloPara(tarea, modelo);
   if (!elegido) throw new Error('No hay ningún modelo local instalado');
 
   const opciones = {
     temperature: tarea === 'clasificar' ? 0.1 : 0.3,
+    repeat_penalty: tarea === 'clasificar' ? 1.05 : 1.15,
+    repeat_last_n: 256,
     num_ctx: OPCIONES_BASE.num_ctx,
     num_batch: OPCIONES_BASE.num_batch,
     num_predict: NUM_PREDICT[tarea] || NUM_PREDICT.resumir
@@ -132,6 +148,9 @@ async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad 
   if (OPCIONES_BASE.num_gpu >= 0) opciones.num_gpu = OPCIONES_BASE.num_gpu;
 
   return enCola(async () => {
+    const senal = signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)])
+      : AbortSignal.timeout(TIMEOUT_MS);
     const r = await fetch(OLLAMA + '/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,7 +163,7 @@ async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad 
         keep_alive: KEEP_ALIVE,
         options: opciones
       }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      signal: senal
     });
     if (!r.ok) {
       const t = await r.text().catch(() => '');
@@ -152,7 +171,7 @@ async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad 
     }
     const d = await r.json();
     return String(d.response || '').trim();
-  }, prioridad);
+  }, prioridad, signal);
 }
 
 // Descarga un modelo. No pasa por la cola de inferencia (puede tardar mucho),

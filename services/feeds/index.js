@@ -294,9 +294,12 @@ async function procesarColaES() {
         colaES.delete(id);
         if (lote.length >= 6) break;
       }
-      await mapLimit(lote, 3, async ([id, entrada]) => {
+      await mapLimit(lote, 1, async ([id, entrada]) => {
         try {
           await traducirArticulo(id, entrada);
+          // Respiro entre artículos: si llega un pedido del usuario, entra
+          // enseguida en la cola de Ollama en vez de esperar el lote entero.
+          await new Promise((r) => setTimeout(r, 1200));
         } catch {
           entrada.intentos++;
           if (entrada.intentos < 2) colaES.set(id, entrada);
@@ -312,7 +315,11 @@ async function procesarColaES() {
 
 function encolarPendientes(limite = 200) {
   try {
-    const filas = db.prepare('SELECT id, user_id FROM articles WHERE titulo_es IS NULL ORDER BY fecha DESC LIMIT ?').all(limite);
+    // Solo noticias recientes: traducir el archivo viejo entero no aporta y
+    // mantiene la CPU ocupada sin que nadie lo note.
+    const filas = db.prepare(
+      "SELECT id, user_id FROM articles WHERE titulo_es IS NULL AND fecha >= datetime('now', '-10 days') ORDER BY fecha DESC LIMIT ?"
+    ).all(limite);
     if (filas.length) {
       for (const f of filas) {
         if (!colaES.has(f.id)) colaES.set(f.id, { userId: f.user_id, intentos: 0 });
@@ -720,9 +727,11 @@ setInterval(() => {
   refrescarTodo().catch((e) => console.error('[feeds] error en refresco automático:', e.message));
 }, 15 * 60 * 1000);
 
-// Traducción de pendientes: primero un lote y luego cada 5 minutos.
-setTimeout(() => encolarPendientes(400), 12000);
-setInterval(() => encolarPendientes(200), 5 * 60 * 1000);
+// Traducción de pendientes: lotes chicos para no acaparar la CPU. Antes el
+// arranque encolaba hasta 400 artículos y la IA quedaba ocupada durante horas,
+// justo cuando el usuario pedía un resumen.
+setTimeout(() => encolarPendientes(15), 12000);
+setInterval(() => encolarPendientes(15), 10 * 60 * 1000);
 
 app.listen(3002, () => console.log('[feeds] microservicio en :3002'));
 

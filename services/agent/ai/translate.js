@@ -13,6 +13,7 @@ const { entero } = require('../../shared/env');
 const { disponible, preguntar } = require('./ollama');
 const { apiExterna } = require('./providers');
 const { mapLimit } = require('../../shared/async');
+const { textoEnBucle } = require('./rules');
 
 const CACHE_TTL_MS = entero('TRAD_CACHE_MINUTOS', 360, { min: 1, max: 2880 }) * 60000;
 const CACHE_MAX = entero('TRAD_CACHE_MAX', 800, { min: 50, max: 5000 });
@@ -99,6 +100,7 @@ async function traducirTexto(q, cfg) {
       prioridad: 1
     });
     if (!r) throw new Error('ollama sin texto');
+    if (textoEnBucle(r)) throw new Error('la traducción entró en bucle');
     return r;
   };
   const viaApi = async (texto) => apiExterna(

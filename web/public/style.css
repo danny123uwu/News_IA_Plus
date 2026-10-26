@@ -603,20 +603,23 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
 .panel-ia {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: min(440px, 94vw);
-  background: var(--surface);
+  /* Dos capas: si un tema personalizado define --surface con transparencia,
+     la capa --bg de abajo evita que se lea el artículo a través del panel. */
+  background: linear-gradient(var(--surface), var(--surface)), var(--bg);
   border-left: 1px solid var(--border);
   box-shadow: -18px 0 45px rgba(0, 0, 0, .45);
   z-index: 130;
   display: flex; flex-direction: column;
   transform: translateX(105%);
   visibility: hidden;
+  will-change: transform;
   transition: transform .28s ease, visibility .28s;
 }
 .panel-ia.abierto { transform: translateX(0); visibility: visible; }
 .panel-ia-cabecera {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 18px; border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: inherit;
 }
 .panel-ia-titulo { font-weight: 700; font-size: .95rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .panel-ia-cerrar {
