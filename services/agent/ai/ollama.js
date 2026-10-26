@@ -32,9 +32,21 @@ const NUM_PREDICT = {
 
 let etiquetas = { at: 0, modelos: [], ok: false };
 let auto = { clasificar: null, resumir: null };
+let autoLista = '';
 
 function invalidar() {
   etiquetas = { at: 0, modelos: [], ok: false };
+  auto = { clasificar: null, resumir: null };
+  autoLista = '';
+}
+
+// La elección automática se recalcula si cambió la lista de modelos instalados.
+// Así, si el usuario descarga un modelo mejor (por ejemplo llama3.2:3b) con el
+// servicio ya corriendo, la próxima respuesta lo usa sin reiniciar nada.
+function sincronizarAuto() {
+  const lista = etiquetas.modelos.map((m) => m.name).sort().join(',');
+  if (lista === autoLista) return;
+  autoLista = lista;
   auto = { clasificar: null, resumir: null };
 }
 
@@ -66,6 +78,7 @@ async function disponible() {
 
 function modeloPara(tarea, preferido) {
   if (preferido) return preferido;
+  sincronizarAuto();
   if (!auto[tarea]) auto[tarea] = elegirAutomatico(etiquetas.modelos, tarea);
   return auto[tarea] || etiquetas.modelos[0]?.name || null;
 }
@@ -76,14 +89,20 @@ function modeloPara(tarea, preferido) {
 const pendientes = [];
 let activos = 0;
 
-function enCola(tarea) {
+function enCola(tarea, prioridad = 0) {
   return new Promise((resolve, reject) => {
     if (pendientes.length >= MAX_COLA) {
       const e = new Error('La IA local está ocupada. Probá de nuevo en unos segundos.');
       e.codigo = 'cola_llena';
       return reject(e);
     }
-    pendientes.push({ tarea, resolve, reject });
+    const trabajo = { tarea, resolve, reject, prioridad };
+    // Prioridad 0 = pedido del usuario (resumen/pregunta); 1 = trabajo de
+    // fondo (clasificar/traducir). Se inserta delante de los de menor
+    // prioridad, manteniendo el orden de llegada entre iguales.
+    let i = pendientes.length;
+    while (i > 0 && (pendientes[i - 1].prioridad || 0) > prioridad) i--;
+    pendientes.splice(i, 0, trabajo);
     siguiente();
   });
 }
@@ -99,7 +118,7 @@ function siguiente() {
   }
 }
 
-async function preguntar({ prompt, system, modelo, tarea = 'resumir' }) {
+async function preguntar({ prompt, system, modelo, tarea = 'resumir', prioridad = 0 }) {
   const elegido = modeloPara(tarea, modelo);
   if (!elegido) throw new Error('No hay ningún modelo local instalado');
 
@@ -133,7 +152,7 @@ async function preguntar({ prompt, system, modelo, tarea = 'resumir' }) {
     }
     const d = await r.json();
     return String(d.response || '').trim();
-  });
+  }, prioridad);
 }
 
 // Descarga un modelo. No pasa por la cola de inferencia (puede tardar mucho),

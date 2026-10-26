@@ -585,6 +585,63 @@ main { max-width: 980px; margin: 0 auto; padding: 18px; }
   background: var(--accent-faint); border: 1px solid var(--accent-dim); border-radius: 999px;
   padding: 1px 8px; margin-left: 6px; vertical-align: middle;
 }
+
+/* Aviso cuando la IA no está disponible y se usa el respaldo por reglas */
+.aviso-ia {
+  background: var(--surface-2);
+  border: 1px solid var(--accent-dim);
+  border-left: 3px solid #e0a800;
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+  font-size: .84rem;
+  line-height: 1.5;
+}
+
+/* Panel lateral de la IA: entra desde la derecha sin mover el artículo */
+.panel-ia {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(440px, 94vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 45px rgba(0, 0, 0, .45);
+  z-index: 130;
+  display: flex; flex-direction: column;
+  transform: translateX(105%);
+  visibility: hidden;
+  transition: transform .28s ease, visibility .28s;
+}
+.panel-ia.abierto { transform: translateX(0); visibility: visible; }
+.panel-ia-cabecera {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.panel-ia-titulo { font-weight: 700; font-size: .95rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.panel-ia-cerrar {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 1.15rem; line-height: 1; padding: 6px 9px; border-radius: 8px;
+}
+.panel-ia-cerrar:hover { color: var(--text); background: var(--surface-2); }
+.panel-ia-cuerpo {
+  flex: 1; overflow-y: auto; padding: 16px 18px 30px;
+  font-size: .92rem; line-height: 1.65; color: var(--text-dim); white-space: normal;
+}
+.panel-ia-cuerpo p { margin: 0 0 10px; }
+.panel-ia-cuerpo p:last-child { margin-bottom: 0; }
+.panel-ia-cuerpo ul { margin: 8px 0 12px; padding-left: 22px; }
+.panel-ia-cuerpo li { margin-bottom: 6px; }
+.panel-ia-cuerpo .md-titulo { font-weight: 700; color: var(--text); }
+.panel-ia-cuerpo code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: .85em; }
+.panel-ia-cargando { color: var(--muted); font-style: italic; }
+.panel-ia-pregunta {
+  background: var(--surface-2); border-radius: 10px; padding: 9px 12px;
+  font-size: .86rem; color: var(--text); margin-bottom: 12px;
+}
+@media (max-width: 520px) {
+  .panel-ia { width: 100%; border-left: 0; }
+}
 .modal-caja .acciones { margin-top: 0; }
 
 /* Barra de acciones fija al fondo del modal: siempre a la vista, sin bajar */

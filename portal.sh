@@ -145,6 +145,7 @@ eliminar() {
   echo -e "${AZUL}==> Eliminando…${SIN}"
   dc down -v --rmi local --remove-orphans
   echo -e "${VERDE}Listo: no queda nada del sistema en Docker.${SIN}"
+  echo -e "${AMAR}Recordá: la IA se queda sin modelos. Al volver a iniciar, corré ./portal.sh modelos${SIN}"
 }
 
 # ------------------------------------------------------------ BORRAR TODO ---
@@ -158,6 +159,7 @@ borrar_todo() {
   dc down -v --rmi local --remove-orphans
   rm -rf ./data
   echo -e "${VERDE}Eliminado por completo. La próxima vez el sistema arranca vacío.${SIN}"
+  echo -e "${AMAR}Después de iniciar, bajá los modelos de IA con: ./portal.sh modelos${SIN}"
 }
 
 # ------------------------------------------------------------------ MENÚ ---

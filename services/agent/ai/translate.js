@@ -95,7 +95,8 @@ async function traducirTexto(q, cfg) {
       prompt: `Traduce esto al español. Devuelve SOLO la traducción, sin explicaciones:\n\n${texto.slice(0, 2500)}`,
       system: 'Eres un traductor profesional al español.',
       modelo,
-      tarea: 'resumir'
+      tarea: 'resumir',
+      prioridad: 1
     });
     if (!r) throw new Error('ollama sin texto');
     return r;

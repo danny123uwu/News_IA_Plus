@@ -54,6 +54,15 @@ function uidDe(req) {
 }
 
 const porUsuario = (req) => 'u' + (req.user ? req.user.id : (req.ip || 'anon'));
+
+// Mensaje para la interfaz cuando el motor falla y se usa el respaldo local
+// (reglas). Antes el usuario veía "reglas" sin saber por qué.
+function avisoIA(e) {
+  const detalle = String((e && e.message) || '').slice(0, 180);
+  return 'La IA no está disponible' + (detalle ? ': ' + detalle : '') +
+    '. Se muestra un resultado automático. Revisá ⚙️ IA: descargá un modelo local o configurá una API externa.';
+}
+
 const limiteGeneral = crearLimitador({
   ventanaMs: 60000, maximo: entero('RATE_AGENTE_MIN', 120, { min: 10, max: 2000 }), clave: porUsuario,
   mensaje: 'Demasiadas peticiones a la IA. Esperá un momento.'
@@ -229,6 +238,7 @@ app.post('/classify', auth, limiteGeneral, async (req, res) => {
     const { texto: r, motor } = await generar({
       ...prompts.clasificar({ titulo: t, texto: x }),
       tarea: 'clasificar',
+      prioridad: 1,
       cfg: getConfig(uidDe(req))
     });
     const m = r.match(/\[[\s\S]*?\]/);
@@ -252,6 +262,7 @@ app.post('/classify-batch', auth, limiteGeneral, async (req, res) => {
     const { texto: r, motor } = await generar({
       ...prompts.clasificarLote(items),
       tarea: 'clasificar',
+      prioridad: 1,
       cfg: getConfig(uidDe(req))
     });
     const m = r.match(/\[[\s\S]*\]/);
@@ -273,6 +284,7 @@ app.post('/classify-batch', auth, limiteGeneral, async (req, res) => {
 // ---------- RESUMEN / DIGEST / PREGUNTAS ----------
 app.post('/summarize', auth, limiteGeneral, limiteCaro, async (req, res) => {
   const { titulo, texto } = req.body || {};
+  let aviso = '';
   try {
     const { texto: r, motor, ms } = await generar({
       ...prompts.resumir({ titulo: recortar(titulo, 500), texto: recortar(texto, 20000) }),
@@ -280,8 +292,11 @@ app.post('/summarize', auth, limiteGeneral, limiteCaro, async (req, res) => {
       cfg: getConfig(uidDe(req))
     });
     if (r) return res.json({ resumen: r, motor, ms });
-  } catch {}
-  res.json({ resumen: resumenExtractivo(recortar(texto, 20000)), motor: 'reglas' });
+    aviso = avisoIA(new Error('la IA no devolvió texto'));
+  } catch (e) {
+    aviso = avisoIA(e);
+  }
+  res.json({ resumen: resumenExtractivo(recortar(texto, 20000)), motor: 'reglas', aviso });
 });
 
 app.post('/digest', auth, limiteGeneral, limiteCaro, async (req, res) => {
@@ -292,6 +307,7 @@ app.post('/digest', auth, limiteGeneral, limiteCaro, async (req, res) => {
     contenido: recortar(a.contenido, 800)
   }));
   if (!lista.length) return res.json({ digest: 'No hay noticias nuevas en las últimas 24 horas.' });
+  let aviso = '';
   try {
     const { texto: r, motor, ms } = await generar({
       ...prompts.digest(lista),
@@ -299,9 +315,12 @@ app.post('/digest', auth, limiteGeneral, limiteCaro, async (req, res) => {
       cfg: getConfig(uidDe(req))
     });
     if (r) return res.json({ digest: r, motor, ms });
-  } catch {}
+    aviso = avisoIA(new Error('la IA no devolvió texto'));
+  } catch (e) {
+    aviso = avisoIA(e);
+  }
   const resumen = lista.slice(0, 6).map((a) => '• ' + a.titulo + (a.fuente ? ' — ' + a.fuente : '')).join('\n');
-  res.json({ digest: 'Lo importante de hoy:\n' + resumen, motor: 'reglas' });
+  res.json({ digest: 'Lo importante de hoy:\n' + resumen, motor: 'reglas', aviso });
 });
 
 app.post('/ask', auth, limiteGeneral, limiteCaro, async (req, res) => {
@@ -312,6 +331,7 @@ app.post('/ask', auth, limiteGeneral, limiteCaro, async (req, res) => {
     pregunta: recortar(pregunta, 2000)
   });
   const cfg = getConfig(uidDe(req));
+  let aviso = '';
   try {
     let { texto: r, motor, ms } = await generar({ ...p, tarea: 'resumir', cfg });
     if (r && PARECIA_RECHAZO.test(r)) {
@@ -321,10 +341,14 @@ app.post('/ask', auth, limiteGeneral, limiteCaro, async (req, res) => {
       } catch {}
     }
     if (r) return res.json({ respuesta: r, motor, ms });
-  } catch {}
+    aviso = avisoIA(new Error('la IA no devolvió texto'));
+  } catch (e) {
+    aviso = avisoIA(e);
+  }
   res.json({
     respuesta: 'La IA no está disponible en este momento. Fragmento de la noticia: ' + recortar(texto, 400),
-    motor: 'reglas'
+    motor: 'reglas',
+    aviso
   });
 });
 

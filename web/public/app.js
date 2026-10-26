@@ -445,7 +445,7 @@ function mdAHtml(t) {
     const li = l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
     if (li) {
       if (!enLista) { out.push('<ul>'); enLista = true; }
-      out.push('<li>' + enLinea(li[1].replace(/^[-*•]\s+/, '')) + '</li>');
+      out.push('<li>' + enLinea(li[1].replace(/^(?:[-*•]\s+)+/, '')) + '</li>');
       continue;
     }
     if (enLista) { out.push('</ul>'); enLista = false; }
@@ -984,6 +984,41 @@ let modalArticuloId = null;
 let modalSeq = 0;
 let iaSeq = 0;
 
+// ---------- PANEL LATERAL DE LA IA ----------
+// Se abre desde la derecha y flota sobre el artículo: el texto no se mueve ni
+// cambia la posición de lectura (antes la respuesta se insertaba en el flujo).
+function abrirPanelIA({ titulo, motor, aviso, html }) {
+  const panel = $('resultadoIA');
+  if (!panel) return;
+  panel.innerHTML =
+    '<div class="panel-ia-cabecera">' +
+      '<span class="panel-ia-titulo">🤖 ' + esc(titulo || 'Respuesta') +
+        (motor ? ' <span class="ia-motor-tag">' + esc(motor) + '</span>' : '') +
+      '</span>' +
+      '<button class="panel-ia-cerrar" type="button" title="Cerrar (Esc)" aria-label="Cerrar el panel">✕</button>' +
+    '</div>' +
+    '<div class="panel-ia-cuerpo">' +
+      (aviso ? '<div class="aviso-ia">⚠️ ' + esc(aviso) + '</div>' : '') +
+      (html || '') +
+    '</div>';
+  panel.classList.add('abierto');
+  panel.setAttribute('aria-hidden', 'false');
+  const cerrar = panel.querySelector('.panel-ia-cerrar');
+  if (cerrar) cerrar.focus({ preventScroll: true });
+}
+
+function cerrarPanelIA() {
+  const panel = $('resultadoIA');
+  if (!panel) return;
+  panel.classList.remove('abierto');
+  panel.setAttribute('aria-hidden', 'true');
+  panel.innerHTML = '';
+}
+
+$('resultadoIA').addEventListener('click', (e) => {
+  if (e.target.closest('.panel-ia-cerrar')) cerrarPanelIA();
+});
+
 function abrirArticulo(a) {
   const tags = tagsDe(a);
   const titulo = tituloDe(a);
@@ -995,7 +1030,6 @@ function abrirArticulo(a) {
     ${traducido ? `<div class="titulo-original">Título original: ${esc(a.titulo)}</div>` : ''}
     <div class="meta">${esc(a.autor || 'Sin autor')} · ${a.fecha ? new Date(a.fecha).toLocaleString('es-MX') : ''} · ${tags.map((t) => '#' + esc(t)).join(' ')}</div>
     <div class="cuerpo-original" id="cuerpoArt"><p class="cargando-original">Cargando la noticia…</p></div>
-    <div id="resultadoIA"></div>
     <div class="acciones-barra" id="accionesBarra">
       <button class="acciones-toggle" id="btnToggleAcciones" type="button" title="Ocultar o mostrar los botones">⌄ Ocultar acciones</button>
       <div class="acciones">
@@ -1008,6 +1042,7 @@ function abrirArticulo(a) {
       </div>
     </div>`;
   $('modal').classList.remove('oculto');
+  cerrarPanelIA();
   modalArticuloId = a.id;
   const miModal = ++modalSeq;
   api(FEEDS, '/articles/' + a.id, { method: 'PATCH', body: JSON.stringify({ leido: true }) })
@@ -1041,24 +1076,29 @@ function abrirArticulo(a) {
 
   $('mResumir').addEventListener('click', async () => {
     const mi = ++iaSeq;
-    $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 Generando con el motor configurado…</div>';
+    abrirPanelIA({ titulo: 'Resumen', html: '<p class="panel-ia-cargando">Generando con el motor configurado…</p>' });
     try {
       const d = await api(AGENT, '/summarize', { method: 'POST', body: JSON.stringify({ titulo: a.titulo, texto: a._textoIA || a.contenido }) });
       if (!iaVigente(mi)) return;
-      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 Resumen <span class="ia-motor-tag">' + esc(d.motor) + '</span>' + mdAHtml(d.resumen) + '</div>';
-    } catch (e) { if (iaVigente(mi)) $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
+      abrirPanelIA({ titulo: 'Resumen', motor: d.motor, aviso: d.aviso, html: mdAHtml(d.resumen) });
+    } catch (e) {
+      if (iaVigente(mi)) abrirPanelIA({ titulo: 'Resumen', html: '<p>❌ ' + esc(e.message) + '</p>' });
+    }
   });
 
   $('mPreguntar').addEventListener('click', async () => {
     const p = prompt('¿Qué quieres saber de esta noticia?');
     if (!p) return;
     const mi = ++iaSeq;
-    $('resultadoIA').innerHTML = '<div class="resultado-ia">Pensando… 🤖</div>';
+    const pregunta = '<p class="panel-ia-pregunta">💬 ' + esc(p) + '</p>';
+    abrirPanelIA({ titulo: 'Respuesta', html: pregunta + '<p class="panel-ia-cargando">Pensando… 🤖</p>' });
     try {
       const d = await api(AGENT, '/ask', { method: 'POST', body: JSON.stringify({ pregunta: p, titulo: a.titulo, texto: a._textoIA || a.contenido }) });
       if (!iaVigente(mi)) return;
-      $('resultadoIA').innerHTML = '<div class="resultado-ia">🤖 ' + mdAHtml(d.respuesta) + '</div>';
-    } catch (e) { if (iaVigente(mi)) $('resultadoIA').innerHTML = '<div class="resultado-ia">❌ ' + esc(e.message) + '</div>'; }
+      abrirPanelIA({ titulo: 'Respuesta', motor: d.motor, aviso: d.aviso, html: pregunta + mdAHtml(d.respuesta) });
+    } catch (e) {
+      if (iaVigente(mi)) abrirPanelIA({ titulo: 'Respuesta', html: pregunta + '<p>❌ ' + esc(e.message) + '</p>' });
+    }
   });
 
   $('mRecorte').addEventListener('click', async () => {
@@ -1187,6 +1227,7 @@ function cargarCuerpoEnModal(a) {
 }
 
 function cerrarModal() {
+  cerrarPanelIA();
   $('modal').classList.add('oculto');
   document.body.classList.remove('modal-abierto');
   modalArticuloId = null;
@@ -1194,7 +1235,12 @@ function cerrarModal() {
 }
 $('modalCerrar').addEventListener('click', cerrarModal);
 $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  // Primero cierra el panel de la IA; si ya está cerrado, cierra el artículo.
+  if ($('resultadoIA').classList.contains('abierto')) cerrarPanelIA();
+  else cerrarModal();
+});
 
 // ---------- DIGEST ----------
 $('btnDigest').addEventListener('click', async () => {
@@ -1204,7 +1250,7 @@ $('btnDigest').addEventListener('click', async () => {
   try {
     const d = await api(FEEDS, '/feed?horas=24&intereses=' + encodeURIComponent((yo.intereses || []).join(',')));
     const dg = await api(AGENT, '/digest', { method: 'POST', body: JSON.stringify({ articulos: d.articulos }) });
-    caja.innerHTML = mdAHtml(dg.digest);
+    caja.innerHTML = (dg.aviso ? '<p class="aviso-ia">⚠️ ' + esc(dg.aviso) + '</p>' : '') + mdAHtml(dg.digest);
   } catch (e) { caja.textContent = '❌ ' + e.message; }
 });
 

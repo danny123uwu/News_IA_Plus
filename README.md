@@ -313,7 +313,16 @@ Con IA local: `./portal.sh modelos` (baja los modelos) y, si tenés NVIDIA, `./p
 
 **18. Las respuestas de la IA salen con `**asteriscos**` y viñetas feas**
 - *Causa:* el modelo devuelve **Markdown** y antes se mostraba como texto plano.
-- *Solución:* el frontend lo renderiza (negritas, viñetas, `código`) en resumen, preguntas y digest.
+- *Solución:* el frontend lo renderiza (negritas, viñetas, `código`) en resumen, preguntas y digest. Tanto el resumen como las preguntas se abren en un **panel lateral** que entra desde la derecha: no mueven el artículo que estás leyendo.
+
+**19. La IA responde "reglas" y avisa que no está disponible**
+- *Causa:* el volumen de Ollama está **vacío** (no hay modelos). Pasa, por ejemplo, después de `./portal.sh eliminar` o `borrar-todo`, que borran el volumen de modelos a propósito.
+- *Solución:* `./portal.sh modelos` (o `bash scripts/docker-ia-modelos.sh`) para bajar `llama3.2:3b` y `qwen2.5:3b`. Verificá con `docker compose exec ollama ollama list`.
+- *Nota:* el aviso en pantalla muestra el error real y el panel etiqueta el motor usado (`ollama:…`, `api:…` o `reglas`).
+
+**20. Descargué un modelo mejor y la IA sigue usando el anterior**
+- *Causa:* antes la elección automática quedaba fijada al arrancar el servicio.
+- *Solución:* ahora se recalcula cuando cambia la lista de modelos instalados. No hace falta reiniciar: la próxima respuesta ya usa el mejor disponible (`llama3.2:3b` para texto, `qwen2.5:3b` para clasificar).
 
 ---
 
