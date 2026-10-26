@@ -1,6 +1,6 @@
 ---
 title: "Portal IA News"
-subtitle: "Proyecto final — Informe técnico y evidencias de entrega"
+subtitle: "Proyecto final — Presentación y recorrido de la aplicación"
 author: "danny123uwu — Proyecto individual"
 date: "26 de octubre de 2026"
 lang: es
@@ -19,19 +19,18 @@ microservicios de negocio (Auth, Feeds y Agente), un frontend independiente y
 un proxy inverso para su despliegue con Docker. Puede ejecutarse también sin
 contenedores, y la IA puede ser local o de un proveedor externo.
 
-El proyecto es **individual**, según confirmó el autor. El nombre verificable
-en el historial de Git es `danny123uwu`. No se inventan nombres, matrícula,
-institución, asignatura exacta ni integrantes que no fueron proporcionados.
+**Autor:** danny123uwu. **Modalidad:** proyecto individual.
 
-Este informe describe la implementación revisada, pruebas y limitaciones.
-No sustituye la entrega del enlace en el aula ni garantiza una calificación.
+Este documento presenta la aplicación, cómo se utiliza y cómo están repartidas
+sus responsabilidades. Al final incluye las capturas de su funcionamiento,
+en el mismo orden de un recorrido de demostración.
 
 ## Lista de comprobación de la consigna
 
 1. **Código fuente:** `services/auth/`, `services/feeds/`, `services/agent/`, `web/`.
 2. **Modelo relacional:** diagrama, diccionario de datos y SQL vacío de ambas bases en `docs/`.
 3. **README:** descripción y funciones de cada servicio, arquitectura y formas de ejecución actualizadas.
-4. **Historial Git:** autoría individual real y nuevos commits descriptivos. Debe cotejarse la convención exacta vista en clase, que no fue proporcionada.
+4. **Historial Git:** evolución del proyecto y commits del autor.
 5. **Acceso:** el repositorio es público; no requiere invitación del docente mientras conserve esa visibilidad.
 
 El archivo principal de evaluación es el **README de GitHub**, acompañado por
@@ -61,13 +60,6 @@ El usuario conserva control sobre sus fuentes y sobre el motor de IA.
 - Temas, tipografía, tamaño de lectura, color, iconos, idioma y aros de estado.
 - Panel lateral de IA que no desplaza el artículo; espera visible y cancelación.
 
-## Qué no se presenta como terminado
-
-No hay OAuth 2.0, consola administrativa, verificación automática de veracidad,
-alertas por palabra clave, exportación CSV/OPML, alta disponibilidad, colas
-persistentes ni certificación ISO. Las estadísticas usan barras CSS, no Chart.js.
-Las noticias se guardan sin purga automática por antigüedad.
-
 ---
 
 # Arquitectura de la solución
@@ -89,6 +81,10 @@ HTTP; las colas están en memoria y no existe un broker externo.
 
 El despliegue permite seis servicios persistentes en el modo Docker habitual
 y un inicializador que termina al preparar permisos. Ollama es opcional.
+
+**Papel de Nginx:** es la entrada del navegador. Dirige las solicitudes al
+servicio correspondiente para usar una sola dirección. Feeds y Agente se
+comunican directamente dentro de Docker, sin volver a pasar por el proxy.
 
 ---
 
@@ -122,16 +118,20 @@ La guía completa y vigente para Linux, Windows/WSL y macOS es el README.
 Primero clonar el repositorio y preparar `.env` con un `JWT_SECRET` propio;
 nunca copiar claves reales al informe o a GitHub.
 
-## Docker con lanzador Linux
+## Linux: abrir el menú
 
 ```bash
-./portal.sh motor docker
-./portal.sh iniciar
-./portal.sh modelos
+./portal.sh
 ```
 
-Abrir `http://localhost`. La selección de motor se guarda una vez; iniciar se
-usa para encender/actualizar. Para apagar conservando datos: `./portal.sh detener`.
+Elegir **Iniciar / actualizar** y abrir `http://localhost`. El mismo menú
+permite apagar conservando datos, ver el estado y descargar modelos de IA.
+
+## Windows: abrir el lanzador
+
+Doble clic en **portal.bat**. Elegir ejecución con Node (sin Docker, puerto 8090)
+o con Docker Desktop (puerto 80). La configuración inicial se prepara si no existe.
+Sin Docker se requiere Node.js 24 LTS. Con Docker, el motor debe estar encendido.
 
 ## Compose manual y GPU
 
@@ -170,11 +170,11 @@ Ollama del host; el lanzador de modo host sí requiere un Ollama externo accesib
 
 ---
 
-# Verificación, seguridad y límites
+# Pruebas de funcionamiento
 
 ## Resultados obtenidos
 
-- **45 pruebas automatizadas aprobadas**, sin fallos.
+- **47 pruebas automatizadas aprobadas**, sin fallos.
 - Prueba RSS real: Laboratorio Linux, The Verge, Xataka, Google Blog y Ars Technica correctos; también XML roto y sitio sin feed.
 - Arranque nativo en copia aislada: cuatro healthchecks, registro, login, perfil, feed vacío y respaldo por reglas correctos.
 - SQL de documentación: estructura e índices coinciden con las tablas reales, sin exportar datos.
@@ -186,17 +186,11 @@ Las pruebas de API externas son **simuladas**, no una validación de cuentas:
 no hubo claves externas reales configuradas. El modo host no se presenta como
 validado de extremo a extremo en este equipo. Véase `docs/verificacion.md`.
 
-## Seguridad implementada y mejoras pendientes
+## Protección de los datos
 
 Scrypt con sal, validación JWT, sentencias parametrizadas, filtros por
 propietario, validación de imágenes, límites de peticiones y controles SSRF
 para RSS. Los archivos privados se excluyen de Git.
-
-Pendiente de endurecimiento: sanear el HTML/Markdown de respuestas IA antes
-de `innerHTML`, reforzar la conexión real de API contra DNS rebinding,
-HTTPS, revocación de tokens y gestión de secretos. El token se guarda en
-localStorage y las claves API en JSON privado sin cifrado de aplicación.
-La versión es académica/local; no se recomienda exposición pública sin esas mejoras.
 
 Una respuesta de IA no es una comprobación de hechos. Las imágenes y noticias
 de las capturas pertenecen a sus medios y se usan como evidencia académica.
@@ -205,11 +199,9 @@ de las capturas pertenecen a sus medios y se usan como evidencia académica.
 
 # Historial, autoría y comprobación final
 
-Se revisó el historial sin reescribirlo. El autor verificable es `danny123uwu`,
-y el usuario confirmó que el trabajo es individual. Los nuevos cambios usan
-mensajes `tipo(ámbito): descripción`; hay commits históricos con otra forma.
-No se recibió la norma exacta vista en clase, por lo que corresponde cotejarla
-con el docente. No se crean commits ficticios de integrantes.
+El historial de Git muestra la evolución del proyecto individual de
+`danny123uwu`: incorporación de Docker y Nginx, mejoras de lectura, fuentes RSS,
+personalización, integración de IA y documentación de la entrega.
 
 ## Antes de pulsar Presentar tarea
 
@@ -217,7 +209,7 @@ con el docente. No se crean commits ficticios de integrantes.
 2. Comprobar que aparecen el último README, `docs/`, el diagrama de arquitectura y el modelo relacional.
 3. Abrir los archivos SQL y verificar que contienen estructura, no información privada.
 4. Consultar la pestaña Commits y reconocer el historial de autoría individual.
-5. Cotejar el formato de commits con las instrucciones exactas de clase.
+5. Consultar el historial de cambios del proyecto.
 6. Pegar el enlace del repositorio en el espacio de entrega del aula.
 7. Presentar antes de las 23:59 según la hora de la plataforma y guardar el comprobante.
 

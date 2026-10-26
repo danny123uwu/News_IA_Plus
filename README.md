@@ -1,25 +1,132 @@
-# Portal IA News — Proyecto final
+# 📰 Portal IA News
 
-Portal de noticias RSS con **tres microservicios de negocio**, frontend independiente,
-autenticación JWT, personalización y asistente de inteligencia artificial local o externo.
+Tu portal de noticias con inteligencia artificial: elegí tus fuentes, organizá
+tu lectura y pedí resúmenes o preguntale a la IA sobre una noticia.
 
-**Entrega:** 26 de octubre de 2026, 23:59. **Modalidad:** individual, confirmada por el autor.
-**Autor en Git:** [danny123uwu](https://github.com/danny123uwu).
-**Repositorio público:** <https://github.com/danny123uwu/News_IA_Plus>.
-No requiere invitación al docente mientras siga siendo público.
+**3 microservicios · JWT · RSS · Docker + Nginx · IA local o API externa**
 
-## Documentación de entrega
+## 🚀 Cómo ejecutarlo
 
-- [Informe final y recorrido con capturas numeradas](docs/entrega-final.md).
-- [Modelo relacional y diccionario de datos](docs/modelo-relacional.md).
-- SQL sin datos personales: [auth.sql](docs/database/auth.sql) y [feeds.sql](docs/database/feeds.sql).
-- [Arquitectura detallada](docs/arquitectura.md) y [catálogo de endpoints](docs/api.md).
-- [Revisión técnica: alcance, límites y mejoras](docs/revision-tecnica.md).
-- [Evidencias de verificación](docs/verificacion.md).
+```bash
+git clone https://github.com/danny123uwu/News_IA_Plus.git
+cd News_IA_Plus
+```
 
-## 1. Arquitectura
+### Linux — menú del proyecto
 
-![Arquitectura de despliegue](docs/diagramas/arquitectura.png)
+Con Docker instalado y encendido:
+
+```bash
+./portal.sh
+```
+
+Desde el menú podés **iniciar, detener, ver el estado, consultar errores,
+descargar modelos y elegir Ollama del sistema o del contenedor**. No hace falta
+memorizar todos los comandos. Abrí **http://localhost** después de iniciar.
+
+La primera vez el lanzador prepara `.env` con una clave propia si no existe
+(necesita `openssl` o Node). Si vas a usar IA local, descargá los modelos
+desde el menú o desde **IA → Descargar** en la aplicación.
+
+### Windows — lanzador con doble clic
+
+Abrí **`portal.bat`**. Tiene un menú para ejecutar con Node, iniciar/detener
+Docker, consultar el estado y descargar modelos. No necesita ejecutar el `.sh`.
+
+- **Sin Docker:** instalá [Node.js 24 LTS](https://nodejs.org/), elegí iniciar
+  con Node y abrí **http://localhost:8090**. La primera vez instala dependencias.
+- **Con Docker:** encendé Docker Desktop con contenedores Linux y elegí iniciar
+  con Docker. Abrí **http://localhost**.
+
+El lanzador crea `.env` con una clave aleatoria si no existe; no reemplaza tu
+configuración. Para apagar la ejecución con Node, usá **Ctrl+C** en su consola.
+
+### Sin Docker — Windows, macOS y Linux
+
+Con Node.js instalado (24 LTS recomendado):
+
+```bash
+npm ci
+npm start
+```
+
+Abrí **http://localhost:8090** y creá tu cuenta. La carpeta de datos se prepara
+sola. Este arranque es para desarrollo local; `npm start` no lee `.env` por sí
+solo. La ejecución con configuración explícita está en [la guía de ejecución](docs/ejecucion.md).
+
+> **Requisitos:** navegador reciente y conexión para importar noticias o usar
+> APIs. Ollama y GPU son opcionales. Con Docker no hace falta instalar Node en
+> el host; sin Docker sí. No ejecutes dos instancias sobre las mismas bases.
+
+## ✨ Qué podés hacer
+
+- **Seguir portales:** catálogo de 152 fuentes, buscador y detección automática de RSS.
+- **Organizar tu feed:** prioridades por medio, intereses, búsqueda y rango de fechas.
+- **Leer a tu manera:** noticias con las imágenes y videos disponibles en su RSS.
+- **Entender una noticia:** resumen y preguntas en un panel lateral que no mueve la lectura.
+- **Guardar lo importante:** favoritos, archivados y recortes de texto.
+- **Ponerte al día:** digest de noticias y traducción al español.
+- **Personalizar:** perfil, foto, temas, colores, tipografía, tamaños, idioma y aros de estado.
+- **Consultar tu actividad:** estadísticas de noticias, lecturas, favoritos y recortes.
+- **Elegir tu IA:** Ollama local o Gemini, Claude, Groq, OpenAI, DeepSeek, OpenRouter y API compatible personalizada.
+
+Las fuentes se actualizan automáticamente cada 15 minutos. El contenido de
+lectura depende de lo que publique el RSS; **Ver fuente** lleva a la noticia
+original. El filtro «último mes» no borra noticias antiguas.
+
+## 🧭 Recorrido rápido
+
+1. **Crear cuenta** e iniciar sesión.
+2. **Mis fuentes:** buscar un portal en el catálogo o pegar su dirección.
+3. **Para Ti:** leer noticias y ajustar las prioridades de tus medios.
+4. **Burbujas superiores:** abrir la portada de una fuente.
+5. **Abrir una noticia:** resumir, preguntar, guardar un recorte o visitar el original.
+6. **Archivados:** recuperar noticias y fragmentos guardados.
+7. **Panel:** consultar estadísticas.
+8. **Mi perfil:** cambiar temas, lectura, idioma e intereses.
+9. **IA:** configurar modelos o proveedor externo.
+
+📸 [Ver el recorrido con capturas ordenadas](docs/entrega-final.md#recorrido-visual-ordenado).
+
+## 🤖 Configurar la inteligencia artificial
+
+### Modelos locales
+
+El contenedor de Ollama empieza sin modelos. Desde el menú del lanzador elegí
+**Descargar modelos** o usá el botón de descarga de la pantalla IA.
+
+| Modelo | Uso recomendado | Descarga aproximada |
+|---|---|---:|
+| `llama3.2:3b` | Resumir, preguntar y digest | 2 GB |
+| `qwen2.5:3b` | Clasificar noticias | 1,9 GB |
+| `gemma2:2b` | Alternativa más pequeña | 1,6 GB |
+
+Los tamaños de descarga no incluyen toda la memoria necesaria al ejecutar.
+Podés usar **CPU o GPU**, y elegir entre **Ollama dentro de Docker** o el que
+ya tengas instalado en tu PC. El cambio no borra los modelos.
+
+En Linux, la opción GPU instala el soporte NVIDIA en Arch/CachyOS y reinicia
+Docker: también puede afectar otros proyectos abiertos. Para Windows, usá
+Docker Desktop con WSL2 y soporte NVIDIA. [Configuración por plataforma](docs/ejecucion.md).
+
+### API externa
+
+En **IA → API externa**: elegí proveedor, ingresá su clave, pulsá **Ver modelos**,
+seleccioná uno, **Probar API** y guardá. Si no querés usar el modelo local,
+dejá desmarcado **Usar IA local como respaldo**.
+
+La clave se escribe en la aplicación, no en el código ni en GitHub. La prueba
+te permite comprobar si tu cuenta tiene acceso y cuota para el modelo elegido.
+
+## 🏗️ Cómo está organizado
+
+| Servicio | Puerto | Qué hace |
+|---|---:|---|
+| **Auth** — `services/auth/` | 3001 | Registro, login con JWT, perfil, foto y preferencias. |
+| **Feeds** — `services/feeds/` | 3002 | Fuentes RSS, noticias, prioridades, búsqueda, recortes y estadísticas. |
+| **Agente IA** — `services/agent/` | 3003 | Resúmenes, preguntas, clasificación, traducción y configuración de modelos. |
+| **Web** — `web/` | 8090 | Interfaz que utiliza el usuario. |
+| **Nginx** — `deploy/nginx/` | 80 | Proxy inverso: recibe al navegador y dirige cada petición al servicio correcto. |
 
 ```mermaid
 flowchart TB
@@ -38,286 +145,108 @@ flowchart TB
   I --> TR[Google Translate / MyMemory]
 ```
 
-El navegador se autentica con `Authorization: Bearer <JWT>`. Cada servicio de
-negocio valida la firma HS256. Feeds envía al agente el usuario propietario de
-las noticias para respetar su elección de IA. No hay broker de mensajes: las
-colas son internas al proceso y la comunicación entre servicios es HTTP.
+**Así funciona con Docker:** el navegador entra por Nginx y este reparte
+`/auth/`, `/feeds/` y `/agente/`. Las llamadas internas, como **Feeds → Agente**,
+van directamente por la red de Docker; no necesitan volver a pasar por Nginx.
+Sin Docker, el navegador utiliza los puertos locales de cada servicio.
 
-### Responsabilidades y funcionalidades
+### Base de datos
 
-| Servicio | Código | Puerto interno | Funcionalidades |
-|---|---|---:|---|
-| Auth | `services/auth/` | 3001 | Registro, login, JWT de 8 horas, perfil, intereses, idioma, foto y preferencias visuales. Contraseñas con scrypt y sal. |
-| Feeds | `services/feeds/` | 3002 | Alta/consulta/edición/baja de fuentes; descubrimiento RSS; importación y actualización; feed por prioridad, fecha e intereses; búsqueda; leídos, favoritos, archivados, recortes y estadísticas. |
-| Agente IA | `services/agent/` | 3003 | Clasificación, resúmenes, preguntas, digest, traducción, configuración por usuario, descarga de modelos locales y prueba/listado de modelos de API. |
-| Web | `web/` | 8090 | Interfaz HTML/CSS/JavaScript sin framework: catálogo, lectura multimedia RSS, panel lateral IA sin desplazar el artículo, temas y ajustes de lectura. |
-| Nginx | `deploy/nginx/` | 80 publicado | Entrada única, enrutamiento, gzip, límites y cabeceras de seguridad. |
-| Ollama, opcional | imagen oficial o instalación del sistema | 11434 | Ejecuta modelos locales. Puede reemplazarse por API externa. |
+Auth guarda los usuarios en **`auth.db`**. Feeds guarda fuentes, artículos y
+recortes en **`feeds.db`**. El Agente guarda las preferencias de IA en
+**`ia.json`**. Todo se prepara al arrancar.
 
-En Docker se ejecutan seis servicios persistentes en el modo local habitual;
-`init-datos` prepara permisos y termina. Solo los cuatro servicios Node tienen
-healthchecks en Compose; no se debe esperar la etiqueta `healthy` en los seis.
+📐 [Modelo relacional y diccionario](docs/modelo-relacional.md) ·
+[SQL de Auth](docs/database/auth.sql) · [SQL de Feeds](docs/database/feeds.sql).
 
-## 2. Modelo relacional
+> `data/` y `.env` son privados: contienen bases, fotos y claves. **No se suben
+> al repositorio.** Apagar el portal conserva los datos y los modelos descargados.
 
-![Modelo relacional real](docs/diagramas/modelo-relacional.png)
+## 🔧 Errores comunes y soluciones
 
-Se usan **dos bases SQLite**, no una base compartida entre todos los servicios:
-`auth.db` contiene `users`; `feeds.db` contiene `sources`, `articles` y `clips`.
-Los IDs de usuario en Feeds son referencias lógicas entre servicios, **sin FK
-entre archivos SQLite**. Tampoco se declaran `FOREIGN KEY` en las tablas de Feeds:
-las relaciones se controlan en consultas y rutas. Los diagramas no inventan esas restricciones.
-El agente persiste su configuración en JSON, no en una quinta tabla SQL.
+Los problemas encontrados durante el desarrollo y cómo resolverlos, sin tener
+que revisar todo el código.
 
-Las tablas y migraciones se crean al iniciar. No hace falta importar el SQL para
-usar la aplicación; los archivos SQL publicados describen el esquema final sin usuarios,
-contraseñas, noticias ni claves privadas. [Diccionario completo](docs/modelo-relacional.md).
+### Arranque y Docker
 
-## 3. Requisitos
+| Problema | Causa habitual | Solución |
+|---|---|---|
+| «Docker no está corriendo» | El motor está apagado. | Abrir Docker Desktop o iniciar Docker en Linux; volver al menú. |
+| «image already exists» al construir | Varios servicios intentan construir la misma imagen. | Usar el lanzador: construye una sola vez. A mano: `docker compose build web` y después `docker compose up -d`. |
+| Puerto 80 ocupado | Otro servidor usa el puerto. | Liberarlo o usar el arranque sin Docker en :8090; no cerrar procesos de otros proyectos sin comprobarlos. |
+| El código actualizado no aparece | La imagen o el navegador conservan la versión anterior. | Elegir **Iniciar / actualizar** y recargar con **Ctrl+Shift+R**. |
+| «node/npm no se reconoce» en Windows | Node no está instalado o no está en PATH. | Instalar Node 24 LTS y volver a abrir la consola o el lanzador. |
 
-- Git, navegador reciente y conexión para importar noticias/usar APIs.
-- **Con Docker:** Docker Engine o Desktop y Compose V2. No hace falta Node en el host.
-- **Sin Docker:** Node.js **24 LTS recomendado** y npm (mínimo declarado: 22.5).
-  Se usa `node:sqlite`, incluido en Node, y `fetch` nativo.
-- **IA local opcional:** Ollama y espacio para descargar los modelos. GPU no obligatoria.
-- `portal.sh` requiere Bash y utilidades de Linux (`readlink -f`, curl).
-  En Windows usá WSL2 o Compose; en macOS usá Compose o Node directamente.
+### Conexión, noticias y datos
 
-## 4. Descargar y preparar la configuración
+| Problema | Causa habitual | Solución |
+|---|---|---|
+| «502 Bad Gateway» | Un servicio todavía no arrancó o está reiniciándose. | Revisar **Estado** y **Logs** desde el menú. Nginx ya actualiza los nombres internos de Docker. |
+| 404 al llamar a una API del portal | Se mezcló la dirección con proxy y la dirección nativa. | Docker: `localhost/auth/...`; sin Docker: `localhost:3001/...`. [Ejemplos](docs/api.md). |
+| Un portal no agrega noticias | URL sin RSS, bloqueo del medio o XML defectuoso. | El proyecto busca el RSS y tolera ciertos errores XML; si no lo encuentra, pegar el feed oficial o probar otra fuente. |
+| Error de permisos tras borrar `data/` | Docker creó la carpeta con otro propietario. | Volver a iniciar desde el lanzador; `init-datos` prepara sus permisos. No borrar datos mientras el portal está activo. |
+| Aparecen archivos `.db-wal` o `.db-shm` | SQLite está trabajando. | Son normales y están ignorados por Git; no borrarlos con la aplicación encendida. |
 
-```bash
-git clone https://github.com/danny123uwu/News_IA_Plus.git
-cd News_IA_Plus
-```
+### Inteligencia artificial
 
-Para Docker o ejecución nativa con configuración explícita, creá `.env` **solo
-si no existe**. Este comando funciona en Bash y PowerShell y genera una clave
-JWT aleatoria; no imprime la clave ni sobrescribe una configuración existente:
+| Problema | Causa habitual | Solución |
+|---|---|---|
+| El resumen indica «reglas» | No hay modelo disponible o falló el motor. | Leer el aviso; descargar un modelo, encender Ollama o configurar una API. |
+| Mucha CPU o respuesta lenta | Inferencia en CPU, carga del modelo o trabajo en curso. | Revisar `ollama ps` durante la generación y la configuración GPU. Cerrar el panel cancela el resumen/pregunta. |
+| GPU al 0 % en reposo | No hay generación activa o el modelo se descargó de memoria. | Comprobar durante una respuesta, no solo después; por defecto se libera a los 30 segundos. |
+| Ollama del sistema no conecta desde Docker | Solo escucha en `127.0.0.1`. | Configurar una dirección accesible y protegerla con firewall. [Guía](docs/ejecucion.md#ollama-del-sistema). |
+| API devuelve 401/403 | Clave incorrecta o falta de permisos. | Revisar la clave del proveedor seleccionado y probar desde IA. |
+| API devuelve 404 | Modelo o URL no disponible. | Pulsar **Ver modelos**, elegir uno accesible y probar de nuevo. |
+| API devuelve 429 | Cuota agotada o límite de solicitudes. | Revisar saldo/cuota y esperar si es un límite temporal. |
+| La traducción no llega | El servicio externo no respondió o aplicó límites. | Reintentar; el portal dispone de servicios de respaldo. |
 
-```bash
-node -e "const fs=require('fs');if(!fs.existsSync('.env'))fs.writeFileSync('.env',fs.readFileSync('.env.example','utf8').replace(/^JWT_SECRET=.*$/m,'JWT_SECRET='+require('crypto').randomBytes(32).toString('hex')),{mode:384});"
-```
+### Lectura e interfaz
 
-Si solo tenés Docker y no Node: copiá `.env.example` a `.env` con tu editor y
-reemplazá `JWT_SECRET` por una clave aleatoria de al menos 32 caracteres
-(`openssl rand -hex 32` en Linux/macOS). **No uses la clave de ejemplo**.
-Nunca publiques `.env`, `data/`, bases ni claves; están ignorados por Git.
+- **Respuestas que se mezclaban al cambiar de noticia:** cada lectura invalida
+  las respuestas anteriores; el panel lateral evita mover el artículo.
+- **Acciones que desaparecían al bajar:** los botones quedan en una barra fija
+  dentro del modal, que también se puede plegar.
+- **Temas que se perdían al cambiar de equipo:** se guardan en el perfil,
+  además de aplicarse en el navegador.
+- **Recortes con error SQL:** se corrigió la consulta de la fuente y el manejo
+  de valores vacíos al guardar el fragmento.
 
-## 5. Formas de ejecutar
+## ⌨️ Atajos opcionales
 
-### A. Linux: lanzador y modelos dentro de Docker
-
-```bash
-./portal.sh motor docker  # guarda la elección; no es necesario repetirlo
-./portal.sh iniciar       # construye una sola imagen y levanta la aplicación
-./portal.sh modelos       # primera vez: descarga qwen2.5:3b y llama3.2:3b
-```
-
-Abrí **http://localhost**. `./portal.sh` sin argumentos muestra el menú.
-Si el runtime NVIDIA está instalado, el lanzador añade la sobrecapa de GPU.
-Sin él, Ollama puede funcionar con CPU. Elegir el motor no enciende el portal;
-`iniciar` aplica la selección guardada en `.env` (`OLLAMA_MODO`).
-
-### B. Docker Compose manual: CPU, Windows/macOS/Linux
+El menú es la entrada principal. Si preferís ir directo, en Linux:
 
 ```bash
-docker compose -f docker-compose.yml build web
-docker compose -f docker-compose.yml up -d
-docker compose exec ollama ollama pull qwen2.5:3b
-docker compose exec ollama ollama pull llama3.2:3b
+./portal.sh iniciar       # construir y encender
+./portal.sh detener       # apagar sin borrar datos
+./portal.sh estado        # consultar servicios
+./portal.sh logs agente   # ver errores de IA
+./portal.sh modelos       # descargar modelos recomendados
+./portal.sh motor host    # elegir Ollama del sistema; aplicar al iniciar
+./portal.sh motor docker  # volver al Ollama del contenedor
 ```
 
-Abrí **http://localhost**. Las dos descargas son opcionales si vas a usar API.
-Construí `web` una sola vez: los servicios Node comparten imagen.
-El Compose básico **no selecciona GPU automáticamente**.
+Para pruebas: **`npm test`**. Para probar portales reales: **`npm run test:feeds`**.
+En Windows las opciones principales están en `portal.bat`.
+**Eliminar** y **Borrar todo** son acciones destructivas, no formas de apagar.
 
-### C. Docker Compose manual con GPU NVIDIA
-
-Requiere driver compatible y NVIDIA Container Toolkit en Linux/WSL según plataforma.
-El instalador `./portal.sh gpu` automatiza la instalación en Arch/CachyOS, pide
-sudo y **reinicia Docker completo**, afectando otros proyectos. En Debian/Ubuntu
-seguí [la instalación oficial de NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml build web
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-docker compose exec ollama ollama ps
-```
-
-Consultá `ollama ps` mientras un modelo esté cargado: `100% GPU` indica las
-capas en GPU, no CPU al 0 %. En reposo puede no haber modelos y `nvidia-smi`
-puede mostrar 0 %. La GPU no garantiza una respuesta instantánea.
-
-### D. Web en Docker y modelos fuera: Ollama del sistema
-
-En `.env`: `OLLAMA_MODO=host` y
-`OLLAMA_HOST_URL=http://host.docker.internal:11434`. Después:
-
-```bash
-./portal.sh motor host
-./portal.sh iniciar
-```
-
-Sin lanzador:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.host.yml build web
-docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
-```
-
-La sobrecapa excluye el servidor Ollama de Docker. Si venías del modo Docker,
-detené **solo su servidor de modelos** con `docker stop ianews-ollama` una vez
-comprobada la conexión al host; el lanzador lo hace automáticamente tras validar.
-Los modelos del host y del contenedor son almacenes independientes; no se borran al cambiar.
-
-**Linux:** un Ollama que solo escucha en `127.0.0.1` no es alcanzable desde
-la red bridge de Docker. Configurá su escucha en una IP accesible del host
-y ajustá `OLLAMA_HOST_URL`. Para systemd: `sudo systemctl edit ollama`,
-añadí `[Service]` y `Environment="OLLAMA_HOST=IP_ACCESIBLE:11434"`, luego
-`sudo systemctl daemon-reload` y `sudo systemctl restart ollama`.
-Si usás `0.0.0.0:11434`, restringí el puerto con firewall a la red Docker:
-**Ollama no tiene autenticación y no debe quedar abierto a Internet/LAN**.
-El lanzador no cambia tu servicio del sistema ni el firewall.
-
-### E. Sin Docker: desarrollo sencillo
-
-```bash
-npm ci
-npm start
-```
-
-Abrí **http://localhost:8090**. Arranca Auth :3001, Feeds :3002, Agente :3003
-y Web :8090 como procesos Node. Se crean las bases vacías; registrá una cuenta
-y agregá fuentes. Si no hay Ollama/API, las rutas que tienen respaldo usan reglas.
-`npm start` **no carga `.env` por sí solo**: en este modo usa el secreto de
-desarrollo si no hay variable exportada. No lo publiques así en Internet.
-
-### F. Sin Docker: configuración explícita y secreto propio
-
-Prepará `.env` como en la sección 4 y cambiá `OLLAMA_URL` a
-`http://127.0.0.1:11434` (el nombre `ollama` solo funciona dentro de Docker).
-Si existen `AGENT_URL`/`FEEDS_URL`, usá `http://localhost:3003` y
-`http://localhost:3002`. Entonces:
-
-```bash
-npm ci
-node --env-file=.env start.js
-```
-
-También podés abrir cuatro terminales con el mismo entorno:
-
-```bash
-node --env-file=.env services/auth/index.js
-node --env-file=.env services/feeds/index.js
-node --env-file=.env services/agent/index.js
-node --env-file=.env web/index.js
-```
-
-No ejecutes simultáneamente dos instancias sobre las mismas bases. Para cambiar
-desde Docker: `./portal.sh detener` antes de arrancar Node. Para detener la
-ejecución nativa: Ctrl+C en sus terminales.
-
-### G. IA por API externa (con cualquiera de los despliegues)
-
-1. Abrí **IA → API externa** y elegí proveedor.
-2. Ingresá la clave **en la aplicación**, nunca en Git o una captura.
-3. **Ver modelos → seleccionar modelo → Probar API → Guardar configuración**.
-4. Dejá desmarcado el respaldo local si no querés que se ejecute Ollama.
-
-Gemini y Claude usan sus protocolos nativos. OpenAI, Groq, DeepSeek, OpenRouter
-y Personalizado usan `/chat/completions`. La prueba no guarda cambios ni usa
-Ollama para aparentar éxito. Las cuentas externas pueden exigir saldo y cuota.
-Cambiar proveedor/dominio no reutiliza la clave anterior.
-
-Para no iniciar ningún Ollama en Docker, se puede usar la sobrecapa
-`docker-compose.host.yml` también en un despliegue **solo API** mediante
-Compose manual; no hace falta que exista un Ollama del host para usar la API.
-El modo `motor host` del lanzador sí exige conectar con Ollama externo.
-
-## 6. Uso y demostración
-
-Registro/login → Mis fuentes → agregar portal o buscar en el catálogo → Para Ti
-→ ajustar prioridades o búsqueda → abrir noticia → Resumir/Preguntar → guardar
-recorte o archivar → Panel → Perfil → ajustes de IA.
-[Capturas y guion paso a paso](docs/entrega-final.md).
-
-El artículo muestra solo el contenido disponible en su RSS, no una copia
-completa garantizada de la web original. `Ver fuente` abre el medio original.
-Las noticias **no se eliminan automáticamente por antigüedad**; filtrar por mes
-no equivale a retención de un mes. Eliminar una fuente elimina sus artículos.
-
-## 7. Operación, pruebas y diagnóstico
-
-```bash
-./portal.sh estado
-./portal.sh logs agente
-./portal.sh detener                 # conserva bases y modelos
-./portal.sh motor estado
-docker compose logs --tail 60 agente
-docker compose exec ollama ollama list
-curl http://localhost/auth/health
-curl http://localhost/feeds/health
-curl http://localhost/agente/health
-npm ci                             # necesario en el host para ejecutar las pruebas
-npm test                           # 45 pruebas en la revisión de entrega
-npm run test:feeds                 # integración con sitios reales, depende de red/terceros
-```
-
-Sin Docker: healthchecks en :3001/health, :3002/health, :3003/health y :8090/health.
-Las pruebas de proveedores externos de `npm test` son **simuladas**: no validan
-cuentas ni consumen créditos. [Resultados y alcance](docs/verificacion.md).
-
-`./portal.sh cuantizar MODELO` es una herramienta opcional **para el contenedor**;
-no garantiza ahorro si el modelo ya está cuantizado. Los tamaños de los modelos
-no incluyen todo el contexto y los buffers de VRAM.
-`RESTART_POLICY=no` evita el arranque automático de contenedores al reiniciar.
-El Ollama del sistema tiene su propia política, independiente del portal.
-
-**Precaución:** `eliminar` borra contenedores y volumen de modelos; `borrar-todo`
-también borra `data/`. No son comandos de apagado ni de actualización.
-Para respaldar: detené el portal y copiá privadamente `data/` y `.env`.
-Los modelos de Docker se guardan en un volumen separado.
-
-## 8. Estructura del repositorio
+## 📁 Código y documentación
 
 ```text
-services/auth/           registro, login, perfil, contraseñas y validación
-services/feeds/          RSS, fuentes, artículos, recortes y estadísticas
-services/agent/          rutas IA y configuración privada por usuario
-services/agent/ai/       proveedores, Ollama, prompts, traducción y reglas
-services/shared/         entorno, HTTP, taxonomía, concurrencia y SSRF
-web/                    servidor de estáticos e interfaz
+portal.sh / portal.bat   lanzadores de Linux y Windows
+start.js                arranque de los cuatro servicios con Node
+services/auth/          usuarios y autenticación
+services/feeds/         fuentes, noticias y recortes
+services/agent/         inteligencia artificial
+services/shared/        utilidades compartidas
+web/                   interfaz y servidor web
 deploy/nginx/           proxy inverso
-scripts/                GPU, descargas, cuantización y prueba RSS
-tests/                  pruebas automatizadas Node
-docs/                   informe, diagramas, SQL y capturas de entrega
-start.js                lanzador Node sin contenedores
-portal.sh               lanzador Bash y elección host/Docker
-docker-compose*.yml     despliegues CPU, GPU y host/solo API
-.env.example            plantilla pública SIN claves reales
-data/                   persistencia privada, ignorada por Git
+docs/                  arquitectura, base de datos y capturas
+tests/                 pruebas automatizadas
 ```
 
-## 9. Seguridad, límites y trabajo futuro
+📄 [Informe y capturas](docs/entrega-final.md) ·
+[Arquitectura](docs/arquitectura.md) · [Rutas para Postman](docs/api.md) ·
+[Resultados de pruebas](docs/verificacion.md) · [Otras formas de ejecución](docs/ejecucion.md).
 
-Se implementan scrypt, JWT, filtros por propietario, sentencias parametrizadas,
-validación de imágenes, límites de petición, cabeceras y defensa SSRF en RSS.
-Esto **no es una certificación ISO ni una auditoría completa de seguridad**.
-No hay OAuth 2.0, HTTPS automático, refresh tokens, administración de usuarios,
-verificación de veracidad, exportación CSV u OPML ni colas persistentes.
-La IA puede equivocarse; hay que contrastar con la noticia original.
-[Revisión honesta y mejoras priorizadas](docs/revision-tecnica.md).
-
-## 10. Autoría y entrega en el aula
-
-El trabajo es individual. El historial conserva al autor real; no se crean
-commits de otros integrantes ni se reescribe el historial para simular trabajo.
-Se usan mensajes nuevos de la forma `tipo(ámbito): descripción`
-(`feat`, `fix`, `docs`, `test`, `perf`). No se dispone del documento de convención
-visto en clase: el estudiante debe cotejarlo con las indicaciones del docente.
-
-En la tarea se entrega este enlace:
-**https://github.com/danny123uwu/News_IA_Plus**.
-Antes de presentar: verificar que GitHub muestra esta versión del README,
-`docs/`, el SQL, los diagramas y el último commit. El informe ayuda a presentar,
-pero **no sustituye cargar el enlace en el aula virtual antes de las 23:59**.
+**Proyecto individual:** [danny123uwu](https://github.com/danny123uwu).
+**Repositorio público:** https://github.com/danny123uwu/News_IA_Plus

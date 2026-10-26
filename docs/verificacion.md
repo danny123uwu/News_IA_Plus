@@ -5,7 +5,7 @@ equipo local del autor; no son una prueba de carga ni de disponibilidad futura.
 
 | Verificación | Resultado | Evidencia |
 |---|---|---|
-| Suite automatizada | 45 pruebas, 45 aprobadas, 0 fallos | [Salida completa](evidencias/pruebas-automatizadas.txt) |
+| Suite automatizada | 47 pruebas, 47 aprobadas, 0 fallos | [Salida completa](evidencias/pruebas-automatizadas.txt) |
 | RSS real | Cinco sitios respondieron con feed y noticias | [Salida de integración](evidencias/pruebas-rss-red.txt) |
 | XML roto / sitio sin feed | Rescate y error comprensible, ambos correctos | Mismo archivo de integración RSS |
 | SQL de documentación | Columnas, tipos, defaults e índices coinciden con las bases reales | [Comparación](evidencias/verificacion-esquema.txt) |
@@ -55,3 +55,10 @@ curl http://localhost/agente/health
 ```
 
 Las respuestas de sitios externos y sus cantidades de noticias cambian con el tiempo.
+
+## Revisión de los lanzadores
+
+El menú de Linux se comprobó con `bash -n portal.sh` y una ejecución de entrada/salida.
+El nuevo `portal.bat` se comprobó en Wine con el intérprete `cmd`: muestra su
+ayuda y menú y permite salir. Esto no sustituye una prueba de arranque completo
+con Node o Docker Desktop en Windows real; ese escenario no se ejecutó en este equipo Linux.
