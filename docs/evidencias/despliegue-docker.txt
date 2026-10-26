@@ -1,0 +1,15 @@
+Verificación real del despliegue Docker — 26 de octubre de 2026
+
+ianews-agente Up 19 minutes (healthy)
+ianews-auth Up 19 minutes (healthy)
+ianews-feeds Up 19 minutes (healthy)
+ianews-nginx Up 26 minutes
+ianews-ollama Up 26 minutes
+ianews-web Up 19 minutes (healthy)
+
+GET /proxy-health -> HTTP 200 ok - proxy nginx
+GET /auth/health -> HTTP 200 {"ok":true,"servicio":"auth"}
+GET /feeds/health -> HTTP 200 {"ok":true,"servicio":"feeds"}
+GET /agente/health -> HTTP 200 {"ok":true,"servicio":"agente","ia_local":true,"modelo":"qwen2.5:3b","modelo_texto":"llama3.2:3b"}
+Solicitud de GPU en Docker: [{"Driver": "nvidia", "Count": -1, "DeviceIDs": null, "Capabilities": [["gpu"]], "Options": null}]
+Contenedores Node con healthcheck: auth, feeds, agente y web. Nginx/Ollama sin healthcheck declarado.

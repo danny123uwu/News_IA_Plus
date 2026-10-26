@@ -1,0 +1,6 @@
+OK auth.users: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
+OK auth: índices coinciden
+OK feeds.sources: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
+OK feeds.articles: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
+OK feeds.clips: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
+OK feeds: índices coinciden

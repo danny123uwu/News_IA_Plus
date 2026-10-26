@@ -1,0 +1,13 @@
+Ejecución real: 26 de octubre de 2026
+Comando: node --env-file=.env start.js
+
+OK health nativo :3001
+OK health nativo :3002
+OK health nativo :3003
+OK health nativo :8090
+OK registro en base aislada
+OK login y JWT
+OK perfil con JWT
+OK feed vacío en nueva instalación
+OK respaldo por reglas sin modelos ni API
+OK datos originales no usados; prueba bajo /tmp/opencode/prueba-nativa

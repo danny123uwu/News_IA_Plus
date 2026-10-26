@@ -1,0 +1,172 @@
+{
+  "resumen_motor": "ollama:llama3.2:3b",
+  "sin_desplazamiento": true,
+  "fuentes_demo_pausadas": true,
+  "capturas": [
+    "01-inicio-sesion.png",
+    "02-registro.png",
+    "03-fuentes-catalogo.png",
+    "04-catalogo-buscador.png",
+    "05-fuentes-agregadas.png",
+    "06-feed-personalizado.png",
+    "07-prioridades.png",
+    "08-portada-fuente.png",
+    "09-lectura-noticia.png",
+    "10-ia-generando.png",
+    "11-resumen-ia-real.png",
+    "12-archivo-recortes.png",
+    "13-panel-estadisticas.png",
+    "14-perfil-temas.png",
+    "15-accesibilidad.png",
+    "16-ia-local.png",
+    "17-api-externa.png",
+    "18-api-claude.png",
+    "19-vista-movil.png",
+    "20-pregunta-ia-real.png",
+    "21-digest-dia.png",
+    "22-tema-claro.png",
+    "23-health-agente.png"
+  ],
+  "fecha": "2026-10-26",
+  "pregunta_ia_real": true,
+  "archivos": [
+    {
+      "archivo": "01-inicio-sesion.png",
+      "sha256": "8684e79a0bcb605c40cee5f4841069cc56bf2f5625277a64f4827651a0240e47",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "02-registro.png",
+      "sha256": "cd0fefec997fa1ca39f4d0d702f9e7334a9da0c468d09db5da05aae967a8b7d5",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "03-fuentes-catalogo.png",
+      "sha256": "3655222ff36c788159313d03418ec1e81e5ea961c2666c74c13bc03160a3c5c2",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "04-catalogo-buscador.png",
+      "sha256": "b08cec345dbf41031d88f6147039b99aa1c0fdefe0dac17dd1421714daf0c7ec",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "05-fuentes-agregadas.png",
+      "sha256": "db7b2488f7f084bf2ab27275bf08ce259933817d2cbfb529119508d269036fee",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "06-feed-personalizado.png",
+      "sha256": "8a9942157f6d7a4890e9b57a095487b237ee056446d5caa30b342fd96b7cc66c",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "07-prioridades.png",
+      "sha256": "eda1662aeb0fed4fe187469eeb2a5d305597624a057cf0f3748f185ba2150323",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "08-portada-fuente.png",
+      "sha256": "dc9a2da66b58bb63d97c0d5b438ed42c1e36915f26ac7ec44eae3857874a8885",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "09-lectura-noticia.png",
+      "sha256": "43d54f6d616792adb37dac510349fcb77feeb7177a30b9389d24290855d85f29",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "10-ia-generando.png",
+      "sha256": "c3a434c46aba8bfc50a673db153a8473ceba3b0ad31caec5ad5b1c2416ecd669",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "11-resumen-ia-real.png",
+      "sha256": "6c26594df2398b305a9d4d481a478bb79763903934f7fec643c04ccb8024771f",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "12-archivo-recortes.png",
+      "sha256": "ea581ee368612a0915c9c38d4466350b6cd76ad858fd8a082fdf3197edb22254",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "13-panel-estadisticas.png",
+      "sha256": "1880d2c57bfbafc4bbd3abbb199abc1d2fe7c74bb036819ad5228453c1e5d086",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "14-perfil-temas.png",
+      "sha256": "28862ca6ffc80590e59b85a4088540d3f40fb5747ade62834ced7f91b6190dfa",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "15-accesibilidad.png",
+      "sha256": "2199398c09e3d5c04bfee4ec86077556259cbc45f48ba8b23ab277554185d436",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "16-ia-local.png",
+      "sha256": "1ffb36e7d23b7633ff05f7705bf18df51791b2cb160ce235e44b8cec6848f9ea",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "17-api-externa.png",
+      "sha256": "f779f6c77d30583c14a653d609cb169282118c11aa2934d92ff610996301e49c",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "18-api-claude.png",
+      "sha256": "7f732c0f98518c95ab3fe04911eaac4dcdd549d3f5783acec11c8ac7e5838985",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "19-vista-movil.png",
+      "sha256": "eafd2a44806472e3353386649a941abf9b3379a2f892fe8f0c0920d8190c1ed6",
+      "ancho": 500,
+      "alto": 846
+    },
+    {
+      "archivo": "20-pregunta-ia-real.png",
+      "sha256": "4f4c0d81482ba1de20d4d6d373def105ecb0448d140d73c5c604bb7de2618b72",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "21-digest-dia.png",
+      "sha256": "95d734ce30817521b5aa0e560974e4e167e7d3c91671ccf212a57521f47d54f5",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "22-tema-claro.png",
+      "sha256": "94802478e7a1cd6e3903aa61910f98e65f6c0bd083086f7c5845c839082d1d66",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "23-health-agente.png",
+      "sha256": "944fc8a635cabcdc30506fa3e951b0d49832390aa75f3d106fbd6de4413533d9",
+      "ancho": 1440,
+      "alto": 914
+    }
+  ]
+}

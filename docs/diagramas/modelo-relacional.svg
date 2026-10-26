@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1330" viewBox="0 0 1800 1330"><rect width="100%" height="100%" fill="#f5f7fb"/>
+<text x="45" y="61" font-family="DejaVu Sans, sans-serif" font-size="36" fill="#0f172a">Portal IA News | Modelo relacional físico y relaciones lógicas</text>
+<text x="45" y="104" font-family="DejaVu Sans, sans-serif" font-size="24" fill="#475569">PK: clave primaria. UQ: unicidad. Las flechas son referencias lógicas: NO hay FK declaradas.</text>
+<polyline points="470,235 600,235" fill="none" stroke="#64748b" stroke-width="4"/>
+<polygon points="600,235 585.5928463623571,241.95944854577968 585.5928463623571,228.04055145422032" fill="#64748b"/>
+<text x="495" y="218" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#0f172a">1 : N</text>
+<polyline points="470,800 535,800 535,760 600,760" fill="none" stroke="#64748b" stroke-width="4"/>
+<polygon points="600,760 585.5928463623571,766.9594485457797 585.5928463623571,753.0405514542203" fill="#64748b"/>
+<text x="480" y="858" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#0f172a">1 : N</text>
+<polyline points="1020,300 1150,300" fill="none" stroke="#64748b" stroke-width="4"/>
+<polygon points="1150,300 1135.5928463623572,306.9594485457797 1135.5928463623572,293.0405514542203" fill="#64748b"/>
+<text x="1050" y="280" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#0f172a">1 : N</text>
+<polyline points="1150,890 1080,890 1080,760 1020,760" fill="none" stroke="#64748b" stroke-width="4"/>
+<polygon points="1020,760 1034.4071536376428,753.0405514542203 1034.4071536376428,766.9594485457797" fill="#64748b"/>
+<text x="1040" y="950" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#0f172a">0..1 : N</text>
+<polyline points="260,915 260,1080 1420,1080 1420,990" fill="none" stroke="#64748b" stroke-width="4"/>
+<polygon points="1420,990 1426.9594485457797,1004.4071536376429 1413.0405514542203,1004.4071536376429" fill="#64748b"/>
+<text x="640" y="1110" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">users.id → articles.user_id (entre bases, relación lógica)</text>
+<rect x="50" y="160" width="420" height="699" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="68" y="204" font-family="DejaVu Sans, sans-serif" font-size="27" fill="#0369a1">auth.db / users</text>
+<text x="68" y="246" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">id INTEGER PK</text>
+<text x="68" y="283" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">email TEXT UQ NOT NULL</text>
+<text x="68" y="320" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">nombre TEXT NOT NULL</text>
+<text x="68" y="357" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">pass TEXT NOT NULL (scrypt)</text>
+<text x="68" y="394" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">rol TEXT</text>
+<text x="68" y="431" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">foto TEXT</text>
+<text x="68" y="468" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">intereses TEXT (JSON)</text>
+<text x="68" y="505" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">creado TEXT</text>
+<text x="68" y="542" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">idioma TEXT</text>
+<text x="68" y="579" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">tema TEXT</text>
+<text x="68" y="616" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">fuente TEXT (tipografía)</text>
+<text x="68" y="653" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">tamano_texto TEXT</text>
+<text x="68" y="690" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">color_texto TEXT</text>
+<text x="68" y="727" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">tamano_iconos TEXT</text>
+<text x="68" y="764" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">aro TEXT</text>
+<text x="68" y="801" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">tema_colores TEXT (JSON)</text>
+<text x="68" y="838" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">color_texto_hex TEXT</text>
+<rect x="600" y="160" width="420" height="329" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="618" y="204" font-family="DejaVu Sans, sans-serif" font-size="27" fill="#0369a1">feeds.db / sources</text>
+<text x="618" y="246" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">id INTEGER PK</text>
+<text x="618" y="283" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">user_id INTEGER NOT NULL</text>
+<text x="618" y="320" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">nombre TEXT NOT NULL</text>
+<text x="618" y="357" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">url TEXT NOT NULL</text>
+<text x="618" y="394" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">activo INTEGER</text>
+<text x="618" y="431" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">prioridad INTEGER</text>
+<text x="618" y="468" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">ultimo_error TEXT</text>
+<rect x="1150" y="160" width="590" height="810" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="1168" y="204" font-family="DejaVu Sans, sans-serif" font-size="27" fill="#0369a1">feeds.db / articles</text>
+<text x="1168" y="246" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">id INTEGER PK</text>
+<text x="1168" y="283" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">user_id INTEGER NOT NULL</text>
+<text x="1168" y="320" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">source_id INTEGER NOT NULL</text>
+<text x="1168" y="357" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">titulo TEXT</text>
+<text x="1168" y="394" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">link TEXT</text>
+<text x="1168" y="431" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">contenido TEXT</text>
+<text x="1168" y="468" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">autor TEXT</text>
+<text x="1168" y="505" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">fecha TEXT</text>
+<text x="1168" y="542" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">etiquetas TEXT (JSON)</text>
+<text x="1168" y="579" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">leido INTEGER</text>
+<text x="1168" y="616" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">favorito INTEGER</text>
+<text x="1168" y="653" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">archivado INTEGER</text>
+<text x="1168" y="690" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">saltado INTEGER</text>
+<text x="1168" y="727" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">imagen TEXT</text>
+<text x="1168" y="764" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">video TEXT</text>
+<text x="1168" y="801" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">titulo_es TEXT</text>
+<text x="1168" y="838" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">resumen_es TEXT</text>
+<text x="1168" y="875" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">idioma TEXT</text>
+<text x="1168" y="912" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">contenido_html TEXT</text>
+<text x="1168" y="949" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">UQ(source_id, link)</text>
+<rect x="600" y="620" width="420" height="403" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="618" y="664" font-family="DejaVu Sans, sans-serif" font-size="27" fill="#0369a1">feeds.db / clips</text>
+<text x="618" y="706" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">id INTEGER PK</text>
+<text x="618" y="743" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">user_id INTEGER NOT NULL</text>
+<text x="618" y="780" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">article_id INTEGER nullable</text>
+<text x="618" y="817" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">titulo TEXT</text>
+<text x="618" y="854" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">texto TEXT</text>
+<text x="618" y="891" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">nota TEXT</text>
+<text x="618" y="928" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">medio TEXT</text>
+<text x="618" y="965" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">link TEXT</text>
+<text x="618" y="1002" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">fecha TEXT</text>
+<text x="45" y="1195" font-family="DejaVu Sans, sans-serif" font-size="25" fill="#0f172a">auth.db y feeds.db son archivos independientes. No existe JOIN SQL entre servicios.</text>
+<text x="45" y="1238" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#0f172a">ia.json no es una tabla relacional. El SQL publicado contiene solo esquema, sin datos personales.</text>
+<text x="45" y="1282" font-family="DejaVu Sans, sans-serif" font-size="22" fill="#0f172a">Detalle de tipos, defaults, índices y límites: docs/modelo-relacional.md y docs/database/*.sql</text>
+</svg>
