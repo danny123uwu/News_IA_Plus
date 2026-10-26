@@ -437,3 +437,42 @@ curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
 - [ ] **Endpoints `/recommend`, `/feedback`, `/verify`, `/regenerate`**
 - [ ] **Gráficas Chart.js** en el dashboard (hoy hay barras en CSS)
 - [x] **Docker + Nginx**: cada microservicio en su contenedor, detrás de un proxy inverso Nginx (puerto 80)
+# Elegir dónde se ejecuta Ollama
+
+La web y sus servicios pueden seguir en Docker aunque los modelos corran fuera:
+
+```bash
+./portal.sh motor docker  # contenedor; GPU automática si existe runtime NVIDIA
+./portal.sh iniciar
+
+./portal.sh motor host    # Ollama del sistema; no inicia el contenedor Ollama
+./portal.sh iniciar
+./portal.sh motor estado
+```
+
+La elección queda en `.env` (`OLLAMA_MODO`). Aplicala con el lanzador, no con
+`docker compose up` a secas (ese comando no selecciona las sobrecapas).
+Los modelos del sistema y del contenedor son almacenes independientes; cambiar
+de modo no borra ninguno. En modo host, elegí tus modelos instalados en ⚙️ IA.
+
+El modo host usa `OLLAMA_HOST_URL` (por defecto
+`http://host.docker.internal:11434`). En Linux, un Ollama que escucha solo en
+`127.0.0.1` **no es accesible desde la red del contenedor**. El lanzador verifica
+la conexión antes de detener el Ollama de Docker. Para configurar el servicio:
+
+```ini
+# sudo systemctl edit ollama
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+```
+
+Después: `sudo systemctl daemon-reload` y `sudo systemctl restart ollama`.
+**Seguridad:** la API de Ollama no exige contraseña. Preferí enlazar a una IP
+del puente Docker, o restringí 11434 en el firewall a la red Docker antes de
+escuchar en `0.0.0.0`; no la expongas a Internet/LAN sin protección.
+El lanzador no cambia el servicio del sistema ni sus reglas de firewall.
+
+GPU no significa CPU al 0 %: tokenización, carga y parte del procesamiento
+siguen usando CPU. Comprobá `ollama ps` durante una generación (en Docker:
+`docker compose exec ollama ollama ps`) y las capas GPU en los logs. La GPU
+en reposo puede marcar 0 % y `ollama ps` vacío no indica un fallo.

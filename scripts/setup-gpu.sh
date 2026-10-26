@@ -46,5 +46,6 @@ echo -e "${VERDE}¡Listo!${SIN} Para comprobarlo:"
 echo "   ./portal.sh estado"
 echo "   docker compose exec ollama ollama ps    # debe decir '100% GPU'"
 echo
-echo -e "${AMAR}Nota:${SIN} si 'ollama ps' sigue diciendo '100% CPU', cerrá sesión y"
-echo "volvé a entrar (o reiniciá la PC) para que el grupo de vídeo se aplique."
+echo -e "${AMAR}Nota:${SIN} ollama ps solo muestra modelos mientras están cargados."
+echo "Generá una respuesta y revisá PROCESSOR; nvidia-smi en reposo puede marcar 0 %."
+echo "Si sigue en CPU, revisá docker compose logs ollama (CUDA / offloaded layers)."

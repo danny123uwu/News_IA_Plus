@@ -13,6 +13,7 @@
 #         ./portal.sh modelos    -> descarga los modelos de IA recomendados
 #         ./portal.sh cuantizar  -> crea una variante Q4_K_M de un modelo (menos VRAM)
 #         ./portal.sh gpu        -> activa la GPU NVIDIA para la IA (pide sudo)
+#         ./portal.sh motor host|docker|estado -> elige dónde ejecutar los modelos
 #         ./portal.sh eliminar   -> borra contenedores, modelos e imagen
 #         ./portal.sh borrar-todo-> elimina TODO (incluida tu base de datos)
 #         ./portal.sh ayuda      -> esta ayuda
@@ -37,8 +38,15 @@ fi
 
 # Si Docker ya tiene el runtime de NVIDIA, se usa la sobrecapa de GPU para que
 # Ollama corra en la tarjeta gráfica en lugar de la CPU/RAM. Si no, va normal.
+MODO_IA="${OLLAMA_MODO:-$(sed -n 's/^OLLAMA_MODO=//p' .env 2>/dev/null | tail -1)}"
+MODO_IA="${MODO_IA:-docker}"
 COMPOSE=(docker compose -f docker-compose.yml)
-if docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
+if [ "$MODO_IA" = host ]; then
+  COMPOSE+=(-f docker-compose.host.yml)
+elif [ "$MODO_IA" != docker ]; then
+  echo "OLLAMA_MODO inválido: usá host o docker."
+  exit 1
+elif docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
   COMPOSE+=(-f docker-compose.gpu.yml)
 fi
 dc() { "${COMPOSE[@]}" "$@"; }
@@ -50,10 +58,22 @@ pausa() { read -rp "Enter para volver al menú... " _; }
 
 # ---------------------------------------------------------------- INICIAR ---
 iniciar() {
+  echo "==> Motor de modelos: $MODO_IA"
   echo -e "${AZUL}==> Construyendo la imagen de los servicios…${SIN}"
   # Se construye UNA sola vez (todos los servicios comparten la misma imagen);
   # si se construyen en paralelo, Docker 29 se queja de la imagen duplicada.
   dc build web || { echo -e "${ROJO}Falló la construcción.${SIN}"; return 1; }
+
+  if [ "$MODO_IA" = host ]; then
+    # No cambiamos el servicio del sistema ni exponemos su API sin permiso.
+    dc run --rm --no-deps agente node -e '
+      fetch(process.env.OLLAMA_URL + "/api/tags", {signal: AbortSignal.timeout(5000)})
+        .then(r => { if (!r.ok) throw Error("HTTP " + r.status); return r.json(); })
+        .then(d => console.log("Ollama externo accesible, modelos:", d.models.length))
+        .catch(e => { console.error("Ollama del host no accesible:", e.message); process.exit(1); });
+    ' || { echo "Revisá OLLAMA_HOST_URL y la dirección de escucha del servicio Ollama (ver README)."; return 1; }
+    docker stop ianews-ollama >/dev/null 2>&1 || true
+  fi
 
   echo -e "${AZUL}==> Levantando los contenedores…${SIN}"
   dc up -d || { echo -e "${ROJO}Falló el arranque.${SIN}"; return 1; }
@@ -86,6 +106,7 @@ detener() {
 
 # -------------------------------------------------------------- REINICIAR ---
 reiniciar() {
+  if [ "$MODO_IA" = host ]; then iniciar; return $?; fi
   echo -e "${AZUL}==> Reiniciando (revisa permisos de data/)…${SIN}"
   # "up -d" vuelve a ejecutar init-datos; "restart" no lo haría y, si borraste
   # la carpeta data/, los servicios no podrían escribir la base.
@@ -95,11 +116,29 @@ reiniciar() {
 
 # ----------------------------------------------------------------- ESTADO ---
 estado() {
+  echo "Motor seleccionado: $MODO_IA (se aplica al iniciar)"
   echo -e "${AZUL}==> Contenedores del sistema:${SIN}"
   dc ps
   echo
   echo -e "${AZUL}==> Respuesta del proxy ($URL):${SIN}"
   curl -fsS "$URL/proxy-health" 2>/dev/null && echo || echo -e "${AMAR}El proxy no responde (¿está apagado?).${SIN}"
+}
+
+seleccionar_motor() {
+  case "${1:-estado}" in
+    estado) echo "Motor seleccionado: $MODO_IA" ;;
+    host|docker)
+      local elegido="$1"
+      if grep -q '^OLLAMA_MODO=' .env 2>/dev/null; then
+        sed -i "s/^OLLAMA_MODO=.*/OLLAMA_MODO=$elegido/" .env
+      else
+        printf '\nOLLAMA_MODO=%s\n' "$elegido" >> .env
+      fi
+      echo "Motor guardado: $elegido. Aplicá con ./portal.sh iniciar"
+      echo "No se borran modelos ni se modifica el Ollama del sistema."
+      ;;
+    *) echo "Uso: ./portal.sh motor host|docker|estado"; return 1 ;;
+  esac
 }
 
 # ------------------------------------------------------------------ LOGS ---
@@ -110,6 +149,11 @@ ver_logs() {
 
 # --------------------------------------------------------------- MODELOS IA -
 bajar_modelos() {
+  if [ "$MODO_IA" = host ]; then
+    echo "Usás Ollama del sistema. Descargá allí con: ollama pull llama3.2:3b"
+    echo "Para clasificar: ollama pull qwen2.5:3b (o elegí tus modelos en ⚙️ IA)."
+    return 0
+  fi
   if [ -x scripts/docker-ia-modelos.sh ]; then
     bash scripts/docker-ia-modelos.sh
   else
@@ -128,6 +172,10 @@ cuantizar_modelos() {
 
 # ------------------------------------------------------------------- GPU IA --
 activar_gpu() {
+  if [ "$MODO_IA" = host ]; then
+    echo "El modo host no necesita NVIDIA Container Toolkit. Revisá: ollama ps"
+    return 0
+  fi
   if [ -x scripts/setup-gpu.sh ]; then
     bash scripts/setup-gpu.sh
   else
@@ -181,6 +229,7 @@ menu() {
     echo "  8) BORRAR TODO (incluye la base de datos)   <-- peligroso"
     echo "  9) Activar GPU para la IA (NVIDIA)"
     echo " 10) Cuantizar un modelo (Q4, menos VRAM)"
+    echo " 11) Elegir motor: Ollama del sistema o Docker"
     echo "  0) Salir"
     echo
     read -rp "Opción: " op
@@ -195,6 +244,7 @@ menu() {
       8) borrar_todo; pausa ;;
       9) activar_gpu; pausa ;;
       10) echo "Modelo a cuantizar (Enter = qwen2.5:3b):"; read -rp "modelo: " m; cuantizar_modelos "${m:-qwen2.5:3b}"; pausa ;;
+      11) read -rp "Motor (host/docker): " m; seleccionar_motor "$m"; pausa; exec "$0" ;;
       0|q) exit 0 ;;
       *) echo -e "${ROJO}Opción inválida.${SIN}" ;;
     esac
@@ -211,6 +261,7 @@ case "${1:-}" in
   modelos|ia)               bajar_modelos ;;
   cuantizar|quantize|q4)     shift || true; cuantizar_modelos "$@" ;;
   gpu|gpu-on)               activar_gpu ;;
+  motor)                    seleccionar_motor "${2:-estado}" ;;
   eliminar|destroy)         eliminar ;;
   borrar-todo|uninstall|purge) borrar_todo ;;
   ayuda|help|-h|--help)

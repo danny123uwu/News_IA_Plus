@@ -1,0 +1,8 @@
+# Ollama del sistema: no se inicia el servidor de modelos de Docker.
+# El Ollama externo debe escuchar en una dirección accesible desde Docker.
+services:
+  ollama:
+    profiles: [ia-contenedor]
+  agente:
+    environment:
+      - OLLAMA_URL=${OLLAMA_HOST_URL:-http://host.docker.internal:11434}
