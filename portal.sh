@@ -86,8 +86,10 @@ detener() {
 
 # -------------------------------------------------------------- REINICIAR ---
 reiniciar() {
-  echo -e "${AZUL}==> Reiniciando…${SIN}"
-  dc restart || true
+  echo -e "${AZUL}==> Reiniciando (revisa permisos de data/)…${SIN}"
+  # "up -d" vuelve a ejecutar init-datos; "restart" no lo haría y, si borraste
+  # la carpeta data/, los servicios no podrían escribir la base.
+  dc up -d || true
   dc ps
 }
 

@@ -59,7 +59,7 @@ Cómo queda el reparto:
 | todo lo demás | `web:8090` (frontend) | `ianews-web` |
 | — | `ollama:11434` | `ianews-ollama` |
 
-Contenedores: `ianews-nginx`, `ianews-web`, `ianews-auth`, `ianews-feeds`, `ianews-agente`, `ianews-ollama`.
+Contenedores: `ianews-nginx`, `ianews-web`, `ianews-auth`, `ianews-feeds`, `ianews-agente`, `ianews-ollama`. Además hay uno efímero, `ianews-init`, que prepara los permisos de `data/` y termina.
 
 ### IA local (Ollama)
 
@@ -108,7 +108,7 @@ portal-ianews/
 ├── start.js            # arranca los 4 servicios con un solo comando (modo sin Docker)
 ├── portal.sh           # LANZADOR: iniciar / detener / estado / logs / eliminar
 ├── Dockerfile          # imagen de los microservicios Node
-├── docker-compose.yml  # 4 servicios + Nginx (proxy inverso) + Ollama
+├── docker-compose.yml  # 4 servicios + Nginx (proxy) + Ollama + init-datos
 ├── docker-compose.gpu.yml  # sobrecapa para dar GPU al contenedor de Ollama
 ├── .env.example        # configuración (JWT_SECRET obligatorio, OLLAMA_URL, rendimiento)
 ├── deploy/nginx/       # configuración del proxy inverso (gzip, CSP, límites)
@@ -269,6 +269,11 @@ Con IA local: `./portal.sh modelos` (baja los modelos) y, si tenés NVIDIA, `./p
 **9. Se crea un archivo raro `*.db-journal` o la base se bloquea**
 - *Causa:* SQLite en modo journal mientras corre el contenedor.
 - *Solución:* es normal; esos archivos están en `.gitignore` y no se suben. No borres la carpeta `data/` con el sistema encendido.
+
+**9 bis. Borré `data/` para empezar de cero y auth falla con `EACCES: permission denied, mkdir '/app/data/uploads'`**
+- *Causa:* al no existir, Docker crea `./data` como **root**, pero los servicios corren como usuario `1000` y no pueden escribir.
+- *Solución:* ya está resuelto con el servicio de un solo uso **`init-datos`**, que crea `data/uploads`, le da el dueño `1000:1000` y arranca antes que auth/feeds/agente. Con `./portal.sh iniciar` (o `docker compose up -d`) se ejecuta solo. Si lo hacés a mano: `docker compose up -d init-datos` y después `docker compose up -d`.
+- *Verificación:* `ls -ld data data/uploads` debe mostrar tu usuario (no `root`), y `docker compose ps` tiene que mostrar `ianews-auth` y `ianews-feeds` en **healthy**.
 
 **10. "data/" aparece en `git status`**
 - *Causa:* las bases y las llaves API viven ahí.

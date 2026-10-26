@@ -30,6 +30,31 @@ x-app: &app
 
 services:
 
+  # --------- Prepara data/ aunque la borres (arranque en limpio) ----------
+  # Docker crea el bind mount ./data como root cuando la carpeta no existe.
+  # Como auth/feeds/agente corren con el usuario 1000, no podrían escribir.
+  # Este contenedor de un solo uso la crea y le da el dueño correcto.
+  init-datos:
+    image: portal-ianews-app
+    container_name: ianews-init
+    user: "0:0"
+    command:
+      - sh
+      - -c
+      - mkdir -p /app/data/uploads && chown -R 1000:1000 /app/data && chmod 700 /app/data /app/data/uploads
+    volumes:
+      - ./data:/app/data
+    network_mode: none
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   # ---------------- Proxy inverso: única puerta de entrada ----------------
   nginx:
     image: nginx:stable-alpine
@@ -66,6 +91,9 @@ services:
     <<: *app
     container_name: ianews-auth
     command: node services/auth/index.js
+    depends_on:
+      init-datos:
+        condition: service_completed_successfully
     environment:
       - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - TRUST_PROXY=1
@@ -83,6 +111,9 @@ services:
     <<: *app
     container_name: ianews-feeds
     command: node services/feeds/index.js
+    depends_on:
+      init-datos:
+        condition: service_completed_successfully
     environment:
       - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - AGENT_URL=http://agente:3003        # habla con el agente por nombre de servicio
@@ -103,6 +134,9 @@ services:
     <<: *app
     container_name: ianews-agente
     command: node services/agent/index.js
+    depends_on:
+      init-datos:
+        condition: service_completed_successfully
     environment:
       - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - FEEDS_URL=http://feeds:3002         # habla con feeds por nombre de servicio
