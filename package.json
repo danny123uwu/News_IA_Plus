@@ -9,6 +9,7 @@
     "feeds": "node services/feeds/index.js",
     "agente": "node services/agent/index.js",
     "web": "node web/index.js",
+    "test": "node --test tests/*.test.js",
     "test:feeds": "node scripts/probar-feeds.js"
   },
   "keywords": [],

@@ -13,6 +13,21 @@
 
 name: portal-ianews
 
+x-seguridad: &seguridad
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  restart: ${RESTART_POLICY:-no}
+  stop_grace_period: 15s
+
+x-app: &app
+  <<: *seguridad
+  build: .
+  image: portal-ianews-app
+  user: "1000:1000"
+  cap_drop:
+    - ALL
+
 services:
 
   # ---------------- Proxy inverso: única puerta de entrada ----------------
@@ -28,32 +43,32 @@ services:
       auth:   { condition: service_healthy }
       feeds:  { condition: service_healthy }
       agente: { condition: service_healthy }
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: ${RESTART_POLICY:-no}
+    stop_grace_period: 15s
 
   # ------------------------------- Frontend -------------------------------
   web:
-    build: .
-    image: portal-ianews-app
+    <<: *app
     container_name: ianews-web
     command: node web/index.js
-    user: "1000:1000"
     expose: ["8090"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
       interval: 10s
       timeout: 3s
       retries: 12
-    restart: ${RESTART_POLICY:-no}
 
   # --------------------- Microservicio: Auth (3001) ----------------------
   auth:
-    build: .
-    image: portal-ianews-app
+    <<: *app
     container_name: ianews-auth
     command: node services/auth/index.js
-    user: "1000:1000"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+      - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
+      - TRUST_PROXY=1
     volumes:
       - ./data:/app/data
     expose: ["3001"]
@@ -62,18 +77,18 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
-    restart: ${RESTART_POLICY:-no}
 
   # -------------------- Microservicio: Feeds (3002) ----------------------
   feeds:
-    build: .
-    image: portal-ianews-app
+    <<: *app
     container_name: ianews-feeds
     command: node services/feeds/index.js
-    user: "1000:1000"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+      - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - AGENT_URL=http://agente:3003        # habla con el agente por nombre de servicio
+      - TRUST_PROXY=1
+      - FEEDS_CONCURRENCIA=${FEEDS_CONCURRENCIA:-3}
+      - RATE_FEEDS_MIN=${RATE_FEEDS_MIN:-180}
     volumes:
       - ./data:/app/data
     expose: ["3002"]
@@ -82,19 +97,32 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
-    restart: ${RESTART_POLICY:-no}
 
   # ------------------- Microservicio: Agente IA (3003) -------------------
   agente:
-    build: .
-    image: portal-ianews-app
+    <<: *app
     container_name: ianews-agente
     command: node services/agent/index.js
-    user: "1000:1000"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-portal-ia-news-dev-secret}
+      - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - FEEDS_URL=http://feeds:3002         # habla con feeds por nombre de servicio
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - TRUST_PROXY=1
+      # --- Rendimiento / GPU ---
+      # num_batch más alto = procesa el prompt en tandas más grandes (usa más
+      # VRAM). 128 es seguro en 2 GB; subí a 256/512 si tenés 6 GB o más.
+      - OLLAMA_NUM_BATCH=${OLLAMA_NUM_BATCH:-128}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-4096}
+      - OLLAMA_NUM_PREDICT=${OLLAMA_NUM_PREDICT:-700}
+      - OLLAMA_NUM_PREDICT_CLASIFICAR=${OLLAMA_NUM_PREDICT_CLASIFICAR:-160}
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30s}
+      - OLLAMA_TIMEOUT_MS=${OLLAMA_TIMEOUT_MS:-180000}
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+      - OLLAMA_MAX_QUEUE=${OLLAMA_MAX_QUEUE:-32}
+      - TRAD_CONCURRENCIA=${TRAD_CONCURRENCIA:-4}
+      - TRAD_CACHE_MAX=${TRAD_CACHE_MAX:-800}
+      - RATE_AGENTE_MIN=${RATE_AGENTE_MIN:-120}
+      - RATE_AGENTE_CARO_MIN=${RATE_AGENTE_CARO_MIN:-24}
     volumes:
       - ./data:/app/data
     expose: ["3003"]
@@ -106,26 +134,31 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
-    restart: ${RESTART_POLICY:-no}
 
   # ---------------------- IA local (Ollama en contenedor) ----------------
   # Arranca "vacío": hay que bajar los modelos una vez con:
-  #   docker compose exec ollama ollama pull qwen2.5-coder:3b
-  #   docker compose exec ollama ollama pull llama3.1:8b
-  # Para usar la GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+  #   ./portal.sh modelos
+  # Para usar la GPU: ./portal.sh gpu
   ollama:
     image: ollama/ollama:latest
     container_name: ianews-ollama
     environment:
-      # Un solo modelo en memoria y sin paralelismo (evita consumo desmedido de RAM)
+      # Un solo modelo en memoria y sin paralelismo (evita consumo desmedido).
       - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_NUM_PARALLEL=1
-      # Descarga el modelo de la memoria al terminar cada consulta (0 = inmediato).
-      # Ajustable en .env; por defecto 30s para no recargarlo en cada pregunta seguida.
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+      - OLLAMA_MAX_QUEUE=${OLLAMA_MAX_QUEUE:-32}
+      # Descarga el modelo de la memoria al terminar (0 = inmediato).
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30s}
+      # Cuantización de la caché KV + flash attention: menos VRAM por contexto.
+      # Si tu versión de Ollama no las soporta, quitá estas dos líneas.
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-1}
+      - OLLAMA_LOAD_TIMEOUT=${OLLAMA_LOAD_TIMEOUT:-5m}
     volumes:
       - ollama_modelos:/root/.ollama
     expose: ["11434"]
+    security_opt:
+      - no-new-privileges:true
     restart: ${RESTART_POLICY:-no}
 
 volumes:

@@ -1,21 +1,48 @@
+'use strict';
+// ============================================================================
+//  Microservicio de feeds / artículos
+//
+//  Mejoras de esta versión:
+//   · consultas que NO traen contenido_html (hasta 20 KB por fila) en las listas
+//   · índices SQLite + WAL para responder más rápido con muchas noticias
+//   · refresco de fuentes con concurrencia limitada y sin solaparse
+//   · clasificación y traducción por lotes en colas (no una petición por noticia)
+//   · estadísticas cacheadas y parseo tolerante de etiquetas
+//   · todas las URLs externas pasan por la protección SSRF de rss.js
+// ============================================================================
+
 const express = require('express');
-const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const { abrirFeed, normalizarUrl } = require('./rss');
+const { resolverSecreto, entero } = require('../shared/env');
+const {
+  cabecerasSeguridad, corsPortal, crearLimitador, recortar, numero, jsonSeguro, listaSegura
+} = require('../shared/http');
+const { mapLimit } = require('../shared/async');
+const { TAXONOMIA, clasificarPorReglas } = require('../shared/taxonomia');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(cabecerasSeguridad);
+app.use(corsPortal());
+app.use(express.json({ limit: '1mb' }));
 
-const SECRET = process.env.JWT_SECRET || 'portal-ia-news-dev-secret';
+const SECRET = resolverSecreto();
 const AGENT = process.env.AGENT_URL || 'http://localhost:3003';
 const DATA = path.join(__dirname, '..', '..', 'data');
-fs.mkdirSync(DATA, { recursive: true });
+fs.mkdirSync(DATA, { recursive: true, mode: 0o700 });
 
 const db = new DatabaseSync(path.join(DATA, 'feeds.db'));
+db.exec('PRAGMA journal_mode=WAL');
+db.exec('PRAGMA synchronous=NORMAL');
+db.exec('PRAGMA busy_timeout=5000');
+db.exec('PRAGMA temp_store=MEMORY');
+db.exec('PRAGMA cache_size=-16000'); // ~16 MB de caché
+
 db.exec(`CREATE TABLE IF NOT EXISTS sources(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -53,15 +80,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS clips(
   fecha TEXT DEFAULT (datetime('now'))
 )`);
 
-const TAXONOMIA = [
-  'Inteligencia Artificial', 'Ciberseguridad', 'Sistemas Operativos',
-  'Desarrollo Web', 'Programación', 'Bases de Datos', 'Móviles',
-  'Nube (Cloud)', 'DevOps', 'Redes', 'Hardware', 'Software',
-  'Lanzamientos', 'Actualizaciones', 'Herramientas', 'Open Source',
-  'Ciencia de Datos', 'Robótica', 'Espacio', 'Ciencias',
-  'Videojuegos', 'eSports', 'Economía', 'Empresas', 'Educación',
-  'Deportes', 'Cine y Series', 'Música', 'Política', 'General'
-];
+// Índices para las consultas más usadas (lista, feed, panel y recortes).
+db.exec('CREATE INDEX IF NOT EXISTS idx_articles_user_fecha ON articles(user_id, fecha DESC)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_articles_user_estado ON articles(user_id, archivado, saltado, leido)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_clips_user_fecha ON clips(user_id, fecha DESC)');
 
 function columnas(tabla) {
   return db.prepare(`PRAGMA table_info(${tabla})`).all().map((c) => c.name);
@@ -72,13 +96,16 @@ for (const c of COLS_ART) {
 }
 
 // Migración 2: el cuerpo de la noticia ya NO se baja de la página original.
-// Solo se muestra el texto/multimedia que trae el propio RSS. Borramos una vez
-// el HTML viejo (era la página completa scrapeada) para partir de cero.
 if (((db.prepare('PRAGMA user_version').get() || {}).user_version || 0) < 2) {
   db.exec('UPDATE articles SET contenido_html=NULL');
   db.exec('PRAGMA user_version=2');
   console.log('[feeds] contenido_html reiniciado: desde ahora solo se usa el del RSS');
 }
+
+// Columnas que sí necesita una tarjeta/lista. Evitamos contenido_html (pesado).
+const CAMPOS_LISTA = `a.id,a.user_id,a.source_id,a.titulo,a.link,a.contenido,a.autor,a.fecha,
+  a.etiquetas,a.leido,a.favorito,a.archivado,a.saltado,a.imagen,a.video,
+  a.titulo_es,a.resumen_es,a.idioma`;
 
 function htmlATexto(html) {
   return String(html || '')
@@ -123,80 +150,183 @@ function videoDe(it, html) {
   return null;
 }
 
+function fechaISO(valor) {
+  if (!valor) return new Date().toISOString();
+  const d = new Date(valor);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 function auth(req, res, next) {
   try {
-    req.user = jwt.verify((req.headers.authorization || '').split(' ')[1], SECRET);
+    const token = (req.headers.authorization || '').split(' ')[1];
+    req.user = jwt.verify(token, SECRET, { algorithms: ['HS256'] });
     next();
   } catch {
     res.status(401).json({ error: 'Token inválido o expirado' });
   }
 }
 
-function etiquetar(titulo, texto) {
-  const t = ((titulo || '') + ' ' + (texto || '')).toLowerCase();
-  const reglas = [
-    ['Inteligencia Artificial', /(^|[^a-zá])ia([^a-zá]|$)|inteligi|llm|gpt|openai|deepseek|gemini|copilot|machine learning|modelo de lenguaje|chatbot|neural/],
-    ['Ciberseguridad', /vulnerab|cve-|ransomware|malware|phishing|hack|brecha|cifrado|exploit|zero.?day|insegur/],
-    ['Sistemas Operativos', /linux|kernel|ubuntu|debian|fedora|arch linux|windows 1[012]|macos|distro|gnome|kde|wayland/],
-    ['Desarrollo Web', /react|angular|vue|svelte|next\.?js|nuxt|django|laravel|rails|frontend|backend|javascript|typescript|web ?dev|wordpress/],
-    ['Programación', /programad|código|codigo|python|rust|golang|c\+\+|compilador|algoritmo|scripting/],
-    ['Bases de Datos', /base de datos|sql|postgres|mysql|mongodb|redis|sqlite|oracle/],
-    ['Móviles', /android|iphone|ios\b|smartphone|aplicación móvil|app móvil|pixel|galaxy|play store|app store/],
-    ['Nube (Cloud)', /cloud|nube |aws|azure|google cloud|servidor|hosting|kubernetes|contenedor/],
-    ['DevOps', /devops|ci\/cd|pipeline|docker|jenkins|terraform|ansible|despliegue|deploy/],
-    ['Redes', /wifi|5g|internet|isp|banda ancha|router|fibra óptica|starlink/],
-    ['Hardware', /gpu|cpu|nvidia|amd |intel |ryzen|radeon|tarjeta gráfica|monitor|ssd|portátil|laptop|procesador|memoria ram/],
-    ['Software', /software|aplicación|navegador|chrome|firefox|edge|vs ?code/],
-    ['Lanzamientos', /lanz|estrena|disponible|nueva versión|release|anuncia|presentó|debut/],
-    ['Actualizaciones', /actualiz|update|parche|patch|hotfix|corrig/],
-    ['Herramientas', /herramienta|terminal|editor|plugin|extensión|librería|sdk/],
-    ['Open Source', /open source|código abierto|opensource|comunidad de código/],
-    ['Ciencia de Datos', /data s|analytics|estadíst|big data|visualización de datos/],
-    ['Robótica', /robot|robót|dron/],
-    ['Espacio', /nasa|espacio|astronáut|cohete|satélite|marte|spacex|orbital/],
-    ['Ciencias', /cienc|física|biolog|investigac|científic/],
-    ['Videojuegos', /juego|gaming|steam|playstation|xbox|nintendo|consola|gameplay|trailer|epic games/],
-    ['eSports', /esport|torneo|competic|campeonato|liga de/],
-    ['Economía', /econom|mercado|inflaci|cripto|bitcoin|dólar|bolsa|inversión|financ/],
-    ['Empresas', /empresa|google|microsoft|apple|meta|amazon|tesla|startup|ceo|despid|adquisi/],
-    ['Educación', /educac|beca|universidad|escuela|curso|certific|academ/],
-    ['Deportes', /fútbol|futbol|nba|nfl|tenis|olímpic|gol |liga /],
-    ['Cine y Series', /película|pelicula|serie |netflix|hbo|disney\+|actor|tráiler/],
-    ['Música', /música|musica|álbum|album|artista|gira|concierto|spotify/],
-    ['Política', /polític|gobierno|elecc|senado|president|congreso/]
-  ];
-  const tags = reglas.filter(([, re]) => re.test(t)).map(([t]) => t);
-  return tags.length ? tags.slice(0, 4) : ['General'];
+const idValido = (v) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+const like = (texto) => '%' + String(texto).replace(/[\\%_]/g, (c) => '\\' + c) + '%';
+
+// ---------------------- limitadores de peticiones --------------------------
+const porUsuario = (req) => 'u' + (req.user ? req.user.id : (req.ip || 'anon'));
+const limiteGeneral = crearLimitador({
+  ventanaMs: 60000, maximo: entero('RATE_FEEDS_MIN', 180, { min: 20, max: 3000 }), clave: porUsuario
+});
+const limiteImportar = crearLimitador({
+  ventanaMs: 600000, maximo: 20, clave: porUsuario,
+  mensaje: 'Demasiadas fuentes agregadas seguidas. Esperá unos minutos.'
+});
+const limiteRefresco = crearLimitador({
+  ventanaMs: 300000, maximo: 8, clave: porUsuario,
+  mensaje: 'Estás actualizando muy seguido. Esperá unos minutos.'
+});
+
+// ---------------- clasificación por lotes (una cola global) ----------------
+const colaClasificar = new Map();
+let clasificando = false;
+let temporizadorClasificar = null;
+let tokenServicioCache = { token: '', hasta: 0 };
+
+function tokenServicio() {
+  const ahora = Date.now();
+  if (tokenServicioCache.token && tokenServicioCache.hasta > ahora) return tokenServicioCache.token;
+  const token = jwt.sign({ id: 0, email: 'feeds@interno', rol: 'servicio' }, SECRET, { expiresIn: '12h', algorithm: 'HS256' });
+  tokenServicioCache = { token, hasta: ahora + 11 * 3600 * 1000 };
+  return token;
+}
+
+function encolarClasificacion(items, userId) {
+  for (const item of items) colaClasificar.set(Number(item.id), { item, userId });
+  if (clasificando || temporizadorClasificar) return;
+  temporizadorClasificar = setTimeout(() => {
+    temporizadorClasificar = null;
+    procesarClasificacion().catch((e) => console.error('[feeds] clasificación:', e.message));
+  }, 250);
+  if (temporizadorClasificar.unref) temporizadorClasificar.unref();
 }
 
 async function reclasificarConIA(items, userId) {
   if (!items.length) return;
+  const r = await fetch(AGENT + '/classify-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenServicio() },
+    body: JSON.stringify({ items, userId }),
+    signal: AbortSignal.timeout(90000)
+  });
+  if (!r.ok) return;
+  const d = await r.json();
+  const actualizar = db.prepare('UPDATE articles SET etiquetas=? WHERE id=?');
+  for (const res of (d.resultados || [])) {
+    if (res && Array.isArray(res.etiquetas) && res.etiquetas.length) {
+      actualizar.run(JSON.stringify(res.etiquetas), res.id);
+    }
+  }
+}
+
+async function procesarClasificacion() {
+  if (clasificando) return;
+  clasificando = true;
   try {
-    const r = await fetch(AGENT + '/classify-batch', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + jwt.sign({ id: 0, email: 'feeds@interno', rol: 'servicio' }, SECRET, { expiresIn: '12h' })
-      },
-      body: JSON.stringify({ items, userId }),
-      signal: AbortSignal.timeout(75000)
-    });
-    if (!r.ok) return;
-    const d = await r.json();
-    for (const res of (d.resultados || [])) {
-      if (res && res.etiquetas && res.etiquetas.length) {
-        db.prepare('UPDATE articles SET etiquetas=? WHERE id=?').run(JSON.stringify(res.etiquetas), res.id);
+    while (colaClasificar.size) {
+      const primero = colaClasificar.values().next().value;
+      const userId = primero.userId;
+      const lote = [];
+      for (const [id, x] of colaClasificar) {
+        if (x.userId !== userId) continue;
+        lote.push(x.item);
+        colaClasificar.delete(id);
+        if (lote.length >= 25) break;
       }
+      try { await reclasificarConIA(lote, userId); } catch {}
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  } finally {
+    clasificando = false;
+    if (colaClasificar.size && !temporizadorClasificar) encolarClasificacion([], 0);
+  }
+}
+
+// ------------------------- cola de traducción ------------------------------
+const colaES = new Map();
+let traduciendo = false;
+
+function encolarTraduccion(ids, userId) {
+  for (const id of ids) {
+    if (!colaES.has(Number(id))) colaES.set(Number(id), { userId: userId ?? null, intentos: 0 });
+  }
+  if (!traduciendo) procesarColaES().catch((e) => console.error('[feeds] traducción:', e.message));
+}
+
+async function traducirArticulo(id, entrada) {
+  const a = db.prepare('SELECT id, user_id, titulo, contenido, titulo_es FROM articles WHERE id=?').get(id);
+  if (!a || a.titulo_es) return;
+  const r = await fetch(AGENT + '/spanish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenServicio() },
+    body: JSON.stringify({
+      titulo: a.titulo,
+      texto: String(a.contenido || '').slice(0, 900),
+      userId: entrada.userId ?? a.user_id
+    }),
+    signal: AbortSignal.timeout(45000)
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  if (d && (d.titulo || d.resumen)) {
+    db.prepare('UPDATE articles SET titulo_es=?, resumen_es=?, idioma=? WHERE id=?')
+      .run(d.titulo || a.titulo, d.resumen || '', d.idioma || 'es', id);
+  }
+}
+
+async function procesarColaES() {
+  if (traduciendo) return;
+  traduciendo = true;
+  try {
+    while (colaES.size) {
+      const lote = [];
+      for (const [id, x] of colaES) {
+        lote.push([id, x]);
+        colaES.delete(id);
+        if (lote.length >= 6) break;
+      }
+      await mapLimit(lote, 3, async ([id, entrada]) => {
+        try {
+          await traducirArticulo(id, entrada);
+        } catch {
+          entrada.intentos++;
+          if (entrada.intentos < 2) colaES.set(id, entrada);
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+      });
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  } finally {
+    traduciendo = false;
+  }
+}
+
+function encolarPendientes(limite = 200) {
+  try {
+    const filas = db.prepare('SELECT id, user_id FROM articles WHERE titulo_es IS NULL ORDER BY fecha DESC LIMIT ?').all(limite);
+    if (filas.length) {
+      for (const f of filas) {
+        if (!colaES.has(f.id)) colaES.set(f.id, { userId: f.user_id, intentos: 0 });
+      }
+      if (!traduciendo) procesarColaES().catch(() => {});
     }
   } catch {}
 }
 
+// --------------------------- importación -----------------------------------
 async function importarFuente(src, feedYaParseado) {
   let feed = feedYaParseado;
   if (!feed) {
     try {
-      // abrirFeed() no solo lee el RSS: si la fuente guardada apunta a una
-      // página web, busca el feed de verdad y nos devuelve su URL.
       const r = await abrirFeed(src.url);
       feed = r.feed;
       if (r.corregida && r.url && r.url !== src.url) {
@@ -213,6 +343,10 @@ async function importarFuente(src, feedYaParseado) {
   let nuevos = 0;
   const pendientes = [];
   const porTraducir = [];
+  const existeStmt = db.prepare('SELECT id, imagen, video, contenido, contenido_html FROM articles WHERE source_id=? AND link=?');
+  const insertar = db.prepare(`INSERT OR IGNORE INTO articles(user_id,source_id,titulo,link,contenido,contenido_html,autor,fecha,etiquetas,imagen,video)
+              VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+
   for (const it of (feed.items || []).slice(0, 30)) {
     if (!it.link) continue;
     const bruto = it['content:encoded'] || it.content || it.contentSnippet || it.summary || '';
@@ -221,7 +355,7 @@ async function importarFuente(src, feedYaParseado) {
     const imagen = imagenDe(it, bruto);
     const video = videoDe(it, bruto);
 
-    const existe = db.prepare('SELECT id, imagen, video, contenido, contenido_html FROM articles WHERE source_id=? AND link=?').get(src.id, it.link);
+    const existe = existeStmt.get(src.id, it.link);
     if (existe) {
       const cambios = [];
       const args = [];
@@ -235,72 +369,67 @@ async function importarFuente(src, feedYaParseado) {
       continue;
     }
 
-    const etiquetas = etiquetar(it.title, contenido);
-    const r = db.prepare(`INSERT OR IGNORE INTO articles(user_id,source_id,titulo,link,contenido,contenido_html,autor,fecha,etiquetas,imagen,video)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(src.user_id, src.id, it.title || '(sin título)', it.link, contenido, contenidoHtml,
-        it.creator || it.author || it['dc:creator'] || feed.title || src.nombre,
-        it.isoDate || it.pubDate || new Date().toISOString(), JSON.stringify(etiquetas), imagen, video);
+    const etiquetas = clasificarPorReglas(it.title, contenido);
+    const r = insertar.run(
+      src.user_id, src.id, it.title || '(sin título)', it.link, contenido, contenidoHtml,
+      it.creator || it.author || it['dc:creator'] || feed.title || src.nombre,
+      fechaISO(it.isoDate || it.pubDate || it['dc:date']),
+      JSON.stringify(etiquetas), imagen, video
+    );
     if (r.changes) {
       nuevos++;
       pendientes.push({ id: Number(r.lastInsertRowid), titulo: it.title || '', texto: contenido.slice(0, 300) });
       porTraducir.push(Number(r.lastInsertRowid));
     }
   }
-  if (pendientes.length) reclasificarConIA(pendientes, src.user_id).catch(() => {});
+
+  if (pendientes.length) encolarClasificacion(pendientes, src.user_id);
   if (porTraducir.length) encolarTraduccion(porTraducir, src.user_id);
   return nuevos;
 }
 
-// ---------- COLA DE TRADUCCIÓN AL ESPAÑOL ----------
-const tokenServicio = () => jwt.sign({ id: 0, email: 'feeds@interno', rol: 'servicio' }, SECRET, { expiresIn: '12h' });
-const colaES = new Map();
-let traduciendo = false;
-
-function encolarTraduccion(ids, userId) {
-  for (const id of ids) colaES.set(id, userId ?? null);
-  if (!traduciendo) procesarColaES().catch(() => {});
-}
-
-async function procesarColaES() {
-  traduciendo = true;
-  while (colaES.size) {
-    const [id, userId] = colaES.entries().next().value;
-    colaES.delete(id);
-    try {
-      const a = db.prepare('SELECT id, user_id, titulo, contenido, titulo_es FROM articles WHERE id=?').get(id);
-      if (!a || a.titulo_es) continue;
-      const r = await fetch(AGENT + '/spanish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenServicio() },
-        body: JSON.stringify({ titulo: a.titulo, texto: String(a.contenido || '').slice(0, 900), userId: userId ?? a.user_id }),
-        signal: AbortSignal.timeout(45000)
-      });
-      if (!r.ok) continue;
-      const d = await r.json();
-      if (d && (d.titulo || d.resumen)) {
-        db.prepare('UPDATE articles SET titulo_es=?, resumen_es=?, idioma=? WHERE id=?')
-          .run(d.titulo || a.titulo, d.resumen || '', d.idioma || 'es', id);
-      }
-    } catch {}
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  traduciendo = false;
-}
+const REFRESCO_CONCURRENCIA = entero('FEEDS_CONCURRENCIA', 3, { min: 1, max: 8 });
+let refrescandoTodo = false;
 
 async function refrescarTodo() {
-  const fuentes = db.prepare('SELECT * FROM sources WHERE activo=1').all();
-  for (const f of fuentes) {
-    await importarFuente(f);
+  if (refrescandoTodo) return 0;
+  refrescandoTodo = true;
+  try {
+    const fuentes = db.prepare('SELECT * FROM sources WHERE activo=1').all();
+    const resultados = await mapLimit(fuentes, REFRESCO_CONCURRENCIA, (f) =>
+      importarFuente(f).catch((e) => {
+        console.error('[feeds] ' + f.nombre + ':', e.message);
+        return 0;
+      })
+    );
+    return resultados.reduce((n, x) => n + x, 0);
+  } finally {
+    refrescandoTodo = false;
   }
 }
 
+const refrescosUsuario = new Map();
+async function refrescarUsuario(userId) {
+  const previo = refrescosUsuario.get(userId);
+  if (previo) return previo;
+  const tarea = (async () => {
+    const fuentes = db.prepare('SELECT * FROM sources WHERE user_id=? AND activo=1').all(userId);
+    const resultados = await mapLimit(fuentes, REFRESCO_CONCURRENCIA, (f) => importarFuente(f).catch(() => 0));
+    return { nuevos: resultados.reduce((n, x) => n + x, 0), fuentes: fuentes.length };
+  })().finally(() => refrescosUsuario.delete(userId));
+  refrescosUsuario.set(userId, tarea);
+  return tarea;
+}
+
+// ------------------------------- rutas -------------------------------------
 app.get('/health', (req, res) => res.json({ ok: true, servicio: 'feeds' }));
 app.get('/taxonomy', auth, (req, res) => res.json({ etiquetas: TAXONOMIA }));
 
-app.post('/feeds/test', auth, async (req, res) => {
+app.post('/feeds/test', auth, limiteImportar, async (req, res) => {
   try {
-    const r = await abrirFeed(String(req.body.url || ''));
+    const url = recortar(req.body && req.body.url, 500);
+    if (!url) return res.json({ ok: false, error: 'Falta la dirección del portal' });
+    const r = await abrirFeed(url);
     res.json({
       ok: true,
       titulo: r.feed.title || 'Feed válido',
@@ -319,15 +448,14 @@ app.get('/feeds', auth, (req, res) => {
   res.json({ fuentes: rows });
 });
 
-app.post('/feeds', auth, async (req, res) => {
-  const pedida = String(req.body.url || '').trim();
-  const nombre = String(req.body.nombre || '').trim() || pedida;
+app.post('/feeds', auth, limiteImportar, async (req, res) => {
+  const pedida = recortar(req.body && req.body.url, 500).trim();
+  const nombre = recortar(req.body && req.body.nombre, 100).trim() || pedida;
   if (!pedida) return res.status(400).json({ error: 'Falta la dirección del portal' });
   if (!/^https?:\/\//.test(pedida) && !/^[\w.-]+\.[a-z]{2,}/i.test(pedida)) {
     return res.status(400).json({ error: 'La URL debe empezar con http(s)://' });
   }
 
-  // abrirFeed(): si pegaste la portada del sitio, busca el feed y devuelve su URL.
   let r;
   try {
     r = await abrirFeed(pedida);
@@ -336,6 +464,7 @@ app.post('/feeds', auth, async (req, res) => {
   }
 
   const url = r.url || normalizarUrl(pedida);
+  if (!url) return res.status(400).json({ error: 'La dirección no es válida' });
   const repetida = db.prepare('SELECT id, nombre FROM sources WHERE user_id=? AND url=?').get(req.user.id, url);
   if (repetida) {
     return res.status(409).json({ error: 'Ese portal ya está en tus fuentes: "' + repetida.nombre + '"' });
@@ -360,94 +489,118 @@ app.post('/feeds', auth, async (req, res) => {
 });
 
 app.put('/feeds/:id', auth, (req, res) => {
-  const src = db.prepare('SELECT * FROM sources WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Fuente inválida' });
+  const src = db.prepare('SELECT * FROM sources WHERE id=? AND user_id=?').get(id, req.user.id);
   if (!src) return res.status(404).json({ error: 'Fuente no encontrada' });
-  const { nombre, activo, prioridad } = req.body || {};
+  const b = req.body || {};
   db.prepare('UPDATE sources SET nombre=?, activo=?, prioridad=? WHERE id=?').run(
-    nombre !== undefined ? String(nombre) : src.nombre,
-    activo !== undefined ? (activo ? 1 : 0) : src.activo,
-    prioridad !== undefined ? Math.max(1, Math.min(5, Number(prioridad))) : src.prioridad,
+    b.nombre !== undefined ? (recortar(b.nombre, 100).trim() || src.nombre) : src.nombre,
+    b.activo !== undefined ? (b.activo ? 1 : 0) : src.activo,
+    b.prioridad !== undefined ? Math.round(numero(b.prioridad, src.prioridad, 1, 5)) : src.prioridad,
     src.id
   );
   res.json({ ok: true });
 });
 
 app.delete('/feeds/:id', auth, (req, res) => {
-  const src = db.prepare('SELECT * FROM sources WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Fuente inválida' });
+  const src = db.prepare('SELECT * FROM sources WHERE id=? AND user_id=?').get(id, req.user.id);
   if (!src) return res.status(404).json({ error: 'Fuente no encontrada' });
   db.prepare('DELETE FROM articles WHERE source_id=?').run(src.id);
   db.prepare('DELETE FROM sources WHERE id=?').run(src.id);
   res.json({ ok: true });
 });
 
-app.post('/feeds/refresh', auth, async (req, res) => {
-  const fuentes = db.prepare('SELECT * FROM sources WHERE user_id=? AND activo=1').all(req.user.id);
-  let nuevos = 0;
-  for (const f of fuentes) nuevos += await importarFuente(f);
-  res.json({ ok: true, nuevos, fuentes: fuentes.length });
+app.post('/feeds/refresh', auth, limiteRefresco, async (req, res) => {
+  try {
+    const r = await refrescarUsuario(req.user.id);
+    res.json({ ok: true, nuevos: r.nuevos, fuentes: r.fuentes });
+  } catch (e) {
+    res.status(500).json({ error: 'No se pudieron actualizar las fuentes: ' + e.message });
+  }
 });
 
-app.get('/articles', auth, (req, res) => {
+app.get('/articles', auth, limiteGeneral, (req, res) => {
   const { estado, fuente, tag, q, archivado } = req.query;
-  let sql = `SELECT a.*, s.nombre AS fuente, s.prioridad FROM articles a
+  let sql = `SELECT ${CAMPOS_LISTA}, s.nombre AS fuente, s.prioridad FROM articles a
              JOIN sources s ON s.id=a.source_id WHERE a.user_id=?`;
   const args = [req.user.id];
   if (archivado === '1') sql += ' AND a.archivado=1';
   else sql += ' AND a.archivado=0';
   if (estado === 'no_leido') sql += ' AND a.leido=0';
   if (estado === 'favorito') sql += ' AND a.favorito=1';
-  if (fuente) { sql += ' AND a.source_id=?'; args.push(fuente); }
-  if (tag) { sql += ' AND a.etiquetas LIKE ?'; args.push('%"' + tag + '"%'); }
-  if (q) { sql += ' AND (a.titulo LIKE ? OR a.contenido LIKE ?)'; args.push('%' + q + '%', '%' + q + '%'); }
-  sql += ' ORDER BY a.fecha DESC LIMIT 100';
+  const fuenteId = idValido(fuente);
+  if (fuenteId) { sql += ' AND a.source_id=?'; args.push(fuenteId); }
+  if (tag) { sql += " AND a.etiquetas LIKE ? ESCAPE '\\'"; args.push(like(recortar(tag, 60))); }
+  if (q) {
+    const buscado = like(recortar(q, 120));
+    sql += " AND (a.titulo LIKE ? ESCAPE '\\' OR a.contenido LIKE ? ESCAPE '\\')";
+    args.push(buscado, buscado);
+  }
+  const limite = Math.round(numero(req.query.limit, 100, 1, 200));
+  const offset = Math.round(numero(req.query.offset, 0, 0, 10000));
+  sql += ' ORDER BY a.fecha DESC LIMIT ? OFFSET ?';
+  args.push(limite, offset);
+
   const rows = db.prepare(sql).all(...args).map((r) => {
-    delete r.contenido_html; // pesa hasta 20 KB — solo se pide al abrir el modal
-    return Object.assign(r, { etiquetas: JSON.parse(r.etiquetas || '[]') });
+    r.etiquetas = listaSegura(r.etiquetas);
+    return r;
   });
   res.json({ articulos: rows });
 });
 
 app.get('/articles/:id', auth, async (req, res) => {
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Artículo inválido' });
   const a = db.prepare(`SELECT a.*, s.nombre AS fuente, s.prioridad FROM articles a
-    JOIN sources s ON s.id=a.source_id WHERE a.id=? AND a.user_id=?`).get(req.params.id, req.user.id);
+    JOIN sources s ON s.id=a.source_id WHERE a.id=? AND a.user_id=?`).get(id, req.user.id);
   if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
+  a.etiquetas = listaSegura(a.etiquetas);
   res.json({ articulo: a });
 });
 
-
-app.get('/feed', auth, (req, res) => {
-  const horas = Number(req.query.horas || 168);
-  const intereses = String(req.query.intereses || '').split(',').filter(Boolean);
-  const q = String(req.query.q || '');
+app.get('/feed', auth, limiteGeneral, (req, res) => {
+  const horas = Math.round(numero(req.query.horas, 168, 1, 8760));
+  const intereses = String(req.query.intereses || '')
+    .split(',').map((s) => s.trim().slice(0, 60)).filter(Boolean).slice(0, 30);
+  const q = recortar(req.query.q, 120).trim().toLowerCase();
   const ahora = Date.now();
   const limite = ahora - horas * 3600 * 1000;
   const limite24 = ahora - 24 * 3600 * 1000;
 
-  let rows = db.prepare(`SELECT a.*, s.nombre AS fuente, s.prioridad FROM articles a
+  let rows = db.prepare(`SELECT ${CAMPOS_LISTA}, s.nombre AS fuente, s.prioridad FROM articles a
     JOIN sources s ON s.id=a.source_id
     WHERE a.user_id=? AND a.saltado=0 AND a.archivado=0
     ORDER BY a.fecha DESC LIMIT 400`).all(req.user.id);
-  if (q) rows = rows.filter((r) => ((r.titulo || '') + ' ' + (r.contenido || '')).toLowerCase().includes(q.toLowerCase()));
-
-  const etiquetas = (r) => { try { return JSON.parse(r.etiquetas || '[]'); } catch { return []; } };
-  const coincide = (r) => intereses.some((t) => etiquetas(r).includes(t));
-  const reciente = (r) => Date.parse(r.fecha) >= limite24;
-  const nivel = (r) => {
-    const pref = r.prioridad >= 4;
-    const match = coincide(r);
-    if (reciente(r)) return pref ? 1 : match ? 2 : 3;
-    return pref ? 4 : match ? 5 : 6;
-  };
-  const orden = (a, b) => a.n - b.n || b.prioridad - a.prioridad || Date.parse(b.fecha) - Date.parse(a.fecha);
+  if (q) rows = rows.filter((r) => ((r.titulo || '') + ' ' + (r.contenido || '')).toLowerCase().includes(q));
 
   const dentro = [];
   const fuera = [];
-  for (const r of rows) (Date.parse(r.fecha) >= limite ? dentro : fuera).push({ r, n: nivel(r) });
+  let conInteres = 0;
+
+  for (const r of rows) {
+    const ts = Date.parse(r.fecha) || 0;
+    const etiquetas = listaSegura(r.etiquetas);
+    const coincide = intereses.length > 0 && intereses.some((t) => etiquetas.includes(t));
+    const reciente = ts >= limite24;
+    const pref = r.prioridad >= 4;
+    const n = reciente ? (pref ? 1 : coincide ? 2 : 3) : (pref ? 4 : coincide ? 5 : 6);
+    const item = { r, n, ts };
+    if (ts >= limite) {
+      dentro.push(item);
+      if (coincide) conInteres++;
+    } else {
+      fuera.push(item);
+    }
+  }
+
+  const orden = (a, b) => a.n - b.n || b.r.prioridad - a.r.prioridad || b.ts - a.ts;
   dentro.sort(orden);
   fuera.sort(orden);
 
   const total = dentro.length;
-  const conInteres = dentro.filter((x) => coincide(x.r)).length;
   let lista = dentro;
   let relleno = false;
   if (lista.length < 12 && fuera.length) {
@@ -455,7 +608,10 @@ app.get('/feed', auth, (req, res) => {
     relleno = true;
   }
   res.json({
-    articulos: lista.slice(0, 60).map((x) => { delete x.r.contenido_html; return x.r; }),
+    articulos: lista.slice(0, 60).map((x) => {
+      x.r.etiquetas = listaSegura(x.r.etiquetas);
+      return x.r;
+    }),
     total,
     conInteres,
     sinIntereses: total - conInteres,
@@ -465,45 +621,63 @@ app.get('/feed', auth, (req, res) => {
   });
 });
 
+const flag = (v, actual) => (v === undefined ? actual : (v === true || v === 1 || v === '1' ? 1 : 0));
+
 app.patch('/articles/:id', auth, (req, res) => {
-  const a = db.prepare('SELECT * FROM articles WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Artículo inválido' });
+  const a = db.prepare('SELECT * FROM articles WHERE id=? AND user_id=?').get(id, req.user.id);
   if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
-  const { leido, favorito, archivado, saltado } = req.body || {};
+  const b = req.body || {};
   db.prepare('UPDATE articles SET leido=?, favorito=?, archivado=?, saltado=? WHERE id=?').run(
-    leido !== undefined ? (leido ? 1 : 0) : a.leido,
-    favorito !== undefined ? (favorito ? 1 : 0) : a.favorito,
-    archivado !== undefined ? (archivado ? 1 : 0) : a.archivado,
-    saltado !== undefined ? (saltado ? 1 : 0) : a.saltado,
+    flag(b.leido, a.leido),
+    flag(b.favorito, a.favorito),
+    flag(b.archivado, a.archivado),
+    flag(b.saltado, a.saltado),
     a.id
   );
+  cacheStats.delete(req.user.id);
   res.json({ ok: true });
 });
 
 app.post('/articles/:id/clip', auth, (req, res) => {
-  // OJO: hay que traer el nombre de la fuente con un JOIN. Si se pasa undefined a
-  // node:sqlite, la consulta revienta (por eso los recortes daban error 500).
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Artículo inválido' });
   const a = db.prepare(`SELECT ar.*, s.nombre AS fuente FROM articles ar
-    JOIN sources s ON s.id=ar.source_id WHERE ar.id=? AND ar.user_id=?`).get(req.params.id, req.user.id);
+    JOIN sources s ON s.id=ar.source_id WHERE ar.id=? AND ar.user_id=?`).get(id, req.user.id);
   if (!a) return res.status(404).json({ error: 'Artículo no encontrado' });
-  const { texto, nota } = req.body || {};
+  const b = req.body || {};
+  const texto = recortar(b.texto, 4000).trim();
   if (!texto) return res.status(400).json({ error: 'Falta el fragmento de texto' });
   db.prepare('INSERT INTO clips(user_id,article_id,titulo,texto,nota,medio,link) VALUES(?,?,?,?,?,?,?)')
-    .run(req.user.id, a.id, a.titulo || null, String(texto).slice(0, 4000), String(nota || ''), a.fuente || null, a.link || null);
+    .run(req.user.id, a.id, a.titulo || null, texto, recortar(b.nota, 1000), a.fuente || null, a.link || null);
+  cacheStats.delete(req.user.id);
   res.json({ ok: true });
 });
 
 app.get('/clips', auth, (req, res) => {
-  const rows = db.prepare('SELECT * FROM clips WHERE user_id=? ORDER BY fecha DESC').all(req.user.id);
+  const rows = db.prepare('SELECT * FROM clips WHERE user_id=? ORDER BY fecha DESC LIMIT 500').all(req.user.id);
   res.json({ recortes: rows });
 });
 
 app.delete('/clips/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM clips WHERE id=? AND user_id=?').run(req.params.id, req.user.id);
+  const id = idValido(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Recorte inválido' });
+  db.prepare('DELETE FROM clips WHERE id=? AND user_id=?').run(id, req.user.id);
+  cacheStats.delete(req.user.id);
   res.json({ ok: true });
 });
 
-app.get('/stats', auth, (req, res) => {
+// El panel se consulta al abrir la pestaña; 20 s de caché evitan recalcular
+// las 4.000 etiquetas cada vez.
+const cacheStats = new Map();
+const STATS_TTL_MS = 20000;
+
+app.get('/stats', auth, limiteGeneral, (req, res) => {
   const u = req.user.id;
+  const hit = cacheStats.get(u);
+  if (hit && hit.exp > Date.now()) return res.json(hit.datos);
+
   const total = db.prepare('SELECT COUNT(*) n FROM articles WHERE user_id=?').get(u).n;
   const leidos = db.prepare('SELECT COUNT(*) n FROM articles WHERE user_id=? AND leido=1').get(u).n;
   const favoritos = db.prepare('SELECT COUNT(*) n FROM articles WHERE user_id=? AND favorito=1').get(u).n;
@@ -511,22 +685,45 @@ app.get('/stats', auth, (req, res) => {
   const recortes = db.prepare('SELECT COUNT(*) n FROM clips WHERE user_id=?').get(u).n;
   const porFuente = db.prepare(`SELECT s.nombre, COUNT(*) n FROM articles a JOIN sources s ON s.id=a.source_id
     WHERE a.user_id=? AND a.leido=1 GROUP BY s.nombre ORDER BY n DESC LIMIT 8`).all(u);
-  const porEtiqueta = db.prepare(`SELECT etiquetas FROM articles WHERE user_id=?`).all(u)
-    .flatMap((r) => JSON.parse(r.etiquetas || '[]'))
+  const porEtiqueta = db.prepare('SELECT etiquetas FROM articles WHERE user_id=?').all(u)
+    .flatMap((r) => listaSegura(r.etiquetas))
     .reduce((acc, t) => { acc[t] = (acc[t] || 0) + 1; return acc; }, {});
-  const topEtiquetas = Object.entries(porEtiqueta).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([nombre, n]) => ({ nombre, n }));
-  res.json({ total, leidos, favoritos, archivados, recortes, porFuente, topEtiquetas });
+  const topEtiquetas = Object.entries(porEtiqueta).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([nombre, n]) => ({ nombre, n }));
+
+  const datos = { total, leidos, favoritos, archivados, recortes, porFuente, topEtiquetas };
+  cacheStats.set(u, { datos, exp: Date.now() + STATS_TTL_MS });
+  if (cacheStats.size > 500) cacheStats.delete(cacheStats.keys().next().value);
+  res.json(datos);
 });
 
-refrescarTodo()
-  .then(() => console.log('[feeds] fuentes iniciales importadas'))
-  .catch((e) => console.error('[feeds] error al importar fuentes iniciales:', e.message));
-setInterval(() => refrescarTodo().catch((e) => console.error('[feeds] error en refresco automático:', e.message)), 15 * 60 * 1000);
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ error: 'La petición es demasiado grande' });
+  }
+  if (err && (err instanceof SyntaxError || err.status === 400)) {
+    return res.status(400).json({ error: 'JSON inválido' });
+  }
+  console.error('[feeds] error:', err && err.message);
+  res.status(500).json({ error: 'Error interno' });
+});
 
-const sinTraducir = db.prepare('SELECT id FROM articles WHERE titulo_es IS NULL ORDER BY fecha DESC').all().map((r) => r.id);
-if (sinTraducir.length) {
-  console.log('[feeds] traduciendo ' + sinTraducir.length + ' noticias al español');
-  encolarTraduccion(sinTraducir);
-}
+// Refresco inicial en segundo plano (no retrasa el healthcheck) y cada 15 min.
+setTimeout(() => {
+  refrescarTodo()
+    .then((n) => { if (n) console.log('[feeds] refresco inicial: ' + n + ' noticias nuevas'); })
+    .catch((e) => console.error('[feeds] error al importar fuentes iniciales:', e.message));
+}, 3000);
+
+setInterval(() => {
+  refrescarTodo().catch((e) => console.error('[feeds] error en refresco automático:', e.message));
+}, 15 * 60 * 1000);
+
+// Traducción de pendientes: primero un lote y luego cada 5 minutos.
+setTimeout(() => encolarPendientes(400), 12000);
+setInterval(() => encolarPendientes(200), 5 * 60 * 1000);
 
 app.listen(3002, () => console.log('[feeds] microservicio en :3002'));
+
+module.exports = { app };

@@ -11,6 +11,7 @@
 #         ./portal.sh estado     -> ver contenedores
 #         ./portal.sh logs agente-> ver logs en vivo
 #         ./portal.sh modelos    -> descarga los modelos de IA recomendados
+#         ./portal.sh cuantizar  -> crea una variante Q4_K_M de un modelo (menos VRAM)
 #         ./portal.sh gpu        -> activa la GPU NVIDIA para la IA (pide sudo)
 #         ./portal.sh eliminar   -> borra contenedores, modelos e imagen
 #         ./portal.sh borrar-todo-> elimina TODO (incluida tu base de datos)
@@ -114,6 +115,15 @@ bajar_modelos() {
   fi
 }
 
+# ---------------------------------------------------------- CUANTIZAR IA ---
+cuantizar_modelos() {
+  if [ -x scripts/cuantizar-modelos.sh ]; then
+    bash scripts/cuantizar-modelos.sh "$@"
+  else
+    echo -e "${AMAR}No encontré scripts/cuantizar-modelos.sh${SIN}"
+  fi
+}
+
 # ------------------------------------------------------------------- GPU IA --
 activar_gpu() {
   if [ -x scripts/setup-gpu.sh ]; then
@@ -166,6 +176,7 @@ menu() {
     echo "  7) Eliminar contenedores, modelos e imagen (conserva datos)"
     echo "  8) BORRAR TODO (incluye la base de datos)   <-- peligroso"
     echo "  9) Activar GPU para la IA (NVIDIA)"
+    echo " 10) Cuantizar un modelo (Q4, menos VRAM)"
     echo "  0) Salir"
     echo
     read -rp "Opción: " op
@@ -179,6 +190,7 @@ menu() {
       7) eliminar; pausa ;;
       8) borrar_todo; pausa ;;
       9) activar_gpu; pausa ;;
+      10) echo "Modelo a cuantizar (Enter = qwen2.5:3b):"; read -rp "modelo: " m; cuantizar_modelos "${m:-qwen2.5:3b}"; pausa ;;
       0|q) exit 0 ;;
       *) echo -e "${ROJO}Opción inválida.${SIN}" ;;
     esac
@@ -193,11 +205,12 @@ case "${1:-}" in
   estado|status|ps)         estado ;;
   logs)                     ver_logs "${2:-}" ;;
   modelos|ia)               bajar_modelos ;;
+  cuantizar|quantize|q4)     shift || true; cuantizar_modelos "$@" ;;
   gpu|gpu-on)               activar_gpu ;;
   eliminar|destroy)         eliminar ;;
   borrar-todo|uninstall|purge) borrar_todo ;;
   ayuda|help|-h|--help)
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
     ;;
   "")                       menu ;;
   *) echo -e "${ROJO}Comando desconocido: $1${SIN}"; echo "Probá:  $0 ayuda" ;;

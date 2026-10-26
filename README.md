@@ -91,9 +91,11 @@ Modelos recomendados (pensados para equipos humildes, ~2 GB de VRAM):
 ./portal.sh detener            # apagar (conserva datos)
 ./portal.sh estado             # ver contenedores
 ./portal.sh gpu                # activar la GPU NVIDIA para la IA (pide sudo)
+./portal.sh cuantizar          # crea una variante Q4_K_M de un modelo (menos VRAM)
 ./portal.sh logs agente        # logs en vivo de un servicio
 ./portal.sh eliminar           # borra contenedores, modelos e imagen
 ./portal.sh borrar-todo        # borra TODO, incluida la base de datos
+npm test                       # 22 pruebas unitarias (seguridad, RSS, auth, IA)
 npm run test:feeds             # prueba el autodescubrimiento de feeds (5 sitios reales)
 ```
 
@@ -108,15 +110,35 @@ portal-ianews/
 ├── Dockerfile          # imagen de los microservicios Node
 ├── docker-compose.yml  # 4 servicios + Nginx (proxy inverso) + Ollama
 ├── docker-compose.gpu.yml  # sobrecapa para dar GPU al contenedor de Ollama
-├── .env.example        # configuración (JWT_SECRET, OLLAMA_URL, RESTART_POLICY)
-├── deploy/nginx/       # configuración del proxy inverso
-├── scripts/            # docker-ia-modelos.sh (baja los modelos recomendados)
+├── .env.example        # configuración (JWT_SECRET obligatorio, OLLAMA_URL, rendimiento)
+├── deploy/nginx/       # configuración del proxy inverso (gzip, CSP, límites)
+├── scripts/            # modelos, cuantización, GPU y prueba de feeds
+├── tests/              # pruebas unitarias (node:test, sin dependencias)
 ├── services/
+│   ├── shared/         # seguridad HTTP, SSRF, entorno, taxonomía y utilidades
+│   │   ├── env.js      #   variables de entorno y validación de JWT_SECRET
+│   │   ├── http.js     #   cabeceras, CORS, rate limit, lectura acotada
+│   │   ├── url-segura.js#  bloqueo de redes internas (SSRF + DNS rebinding)
+│   │   ├── taxonomia.js#   las 30 categorías y el clasificador por reglas
+│   │   └── async.js    #   mapLimit (concurrencia acotada)
 │   ├── auth/           # registro, login, JWT, perfil (puerto 3001)
+│   │   ├── index.js    #   rutas y persistencia
+│   │   ├── password.js #   scrypt asíncrono + comparación en tiempo constante
+│   │   └── validacion.js#  email, contraseña e imágenes reales
 │   ├── feeds/          # fuentes RSS, artículos, feed (puerto 3002)
-│   │   ├── index.js    # endpoints + importación
-│   │   └── rss.js      # descubre el feed del sitio y parsea XML roto
+│   │   ├── index.js    #   endpoints, índices, caché y colas por lotes
+│   │   └── rss.js      #   descubre el feed, parsea XML roto y descarga seguro
 │   └── agent/          # agente IA (puerto 3003)
+│       ├── index.js    #   SOLO rutas HTTP, validación y límites
+│       ├── config.js   #   preferencias por usuario (data/ia.json)
+│       └── ai/         #   lógica de modelos, aislada del negocio
+│           ├── ollama.js    # cola de inferencia y opciones de GPU
+│           ├── providers.js # APIs externas compatibles con OpenAI + Gemini
+│           ├── engine.js    # decide API vs local (y el respaldo opcional)
+│           ├── prompts.js   # plantillas de los prompts
+│           ├── rules.js     # clasificador por reglas y recortes de texto
+│           ├── models.js    # recomendación/elección de modelos
+│           └── translate.js # caché y traducción por lotes
 ├── web/                # frontend (puerto 8090)
 │   └── public/
 │       ├── catalogo.js # catálogo de ~150 portales tech con RSS
@@ -139,6 +161,30 @@ portal-ianews/
 
 Comunicación: el frontend (y entre sí) hablan por HTTP con `Authorization: Bearer <JWT>`.
 
+> **Separación de responsabilidades**: `services/agent/index.js` solo atiende HTTP y validación; la IA vive en `services/agent/ai/` y las preferencias en `config.js`. Si mañana cambia el motor (otro Ollama, otro proveedor), no se toca la lógica de negocio.
+
+## Seguridad
+
+- **JWT_SECRET obligatorio** (mínimo 32 caracteres). Si falta o es el de ejemplo, los servicios **no arrancan** en producción (`NODE_ENV=production`). Generá uno con `openssl rand -hex 32`.
+- **Anti-SSRF**: las URLs de feeds y de APIs externas se validan por protocolo, credenciales y **todas las IPs resueltas**; la conexión real vuelve a comprobar la IP (`lookup`) para evitar DNS rebinding. Se bloquean loopback, redes privadas, CGNAT, link-local/metadatos (`169.254.169.254`), multicast y rangos reservados.
+- **Descarga de feeds acotada**: redirecciones manuales (máx. 5, cada una revalidada), tope de 6 MB **mientras se descarga** (aunque no haya `Content-Length`) y descompresión gzip/deflate/br.
+- **Contraseñas**: scrypt asíncrono (no bloquea el event loop) y comparación en tiempo constante; mínimo 8 caracteres.
+- **Fotos de perfil**: se detecta el tipo real por *magic bytes* (PNG/JPG/GIF/WEBP). HTML, SVG y ejecutables se rechazan; los archivos se sirven con `nosniff` y `CSP: default-src 'none'; sandbox`.
+- **Límites**: rate limit por usuario/IP en login, registro, feeds, agente, descargas de modelos y refrescos; topes de tamaño en cuerpos JSON y en los textos que van a la IA.
+- **Cabeceras**: Nginx agrega CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y `server_tokens off`. Los microservicios también las envían (por si corrés sin Docker).
+- **Contenedores**: `no-new-privileges`, `cap_drop: ALL`, usuario `1000:1000`, `init: true` y `RESTART_POLICY=no`.
+- **Config de IA**: `data/ia.json` se escribe de forma atómica con permisos `600` (las API keys no quedan legibles por otros).
+
+## Rendimiento y consumo de GPU
+
+- **Consultas más livianas**: las listas ya no traen `contenido_html` (hasta 20 KB por fila); el feed bajó de ~0,96 MB a ~0,64 MB y las estadísticas de ~5,6 ms a ~2 ms (caché de 20 s). Índices SQLite + WAL.
+- **Menos llamadas a la IA**: clasificación y traducción van a **colas por lotes** (`/classify-batch`, título+cuerpo en una sola petición cuando se puede), con concurrencia limitada y reintentos. La traducción se cachea en memoria.
+- **Una sola GPU**: la cola de Ollama limita la concurrencia (`OLLAMA_NUM_PARALLEL=1`) y el tamaño de la cola; el healthcheck usa una caché de 5 s para no despertar la GPU.
+- **Ajustes de inferencia** (en `.env`, opcionales): `OLLAMA_NUM_CTX`, `OLLAMA_NUM_BATCH`, `OLLAMA_NUM_PREDICT`, `OLLAMA_NUM_PREDICT_CLASIFICAR`, `OLLAMA_KEEP_ALIVE`. Menos contexto/tanda = menos VRAM. Clasificar usa 160 tokens y resumir 700.
+- **Cuantización**: los modelos recomendados ya son **Q4_K_M**. Además el compose activa `OLLAMA_KV_CACHE_TYPE=q8_0` y `OLLAMA_FLASH_ATTENTION=1` (la caché KV ocupa ~la mitad). Para convertir un modelo propio: `./portal.sh cuantizar`.
+- **Nginx** comprime JSON/JS/CSS con gzip y cachea estáticos (7 días para imágenes, `no-cache` para el HTML).
+- **Con "API externa" la IA local no se usa**: no se carga ningún modelo en la GPU salvo que actives la casilla de respaldo local.
+
 ## Recorrido rápido
 1. Crear cuenta en la página
 2. "Mis fuentes" → **catálogo con buscador** (~150 portales por categoría, un clic para agregar) o presets rápidos. En "Agregar portal" podés pegar **la dirección del sitio** (no hace falta el enlace del RSS): el sistema **busca el feed** y guarda la URL correcta.
@@ -151,7 +197,7 @@ Comunicación: el frontend (y entre sí) hablan por HTTP con `Authorization: Bea
 9. **Buscar**: filtra mientras escribís; **Enter fija la búsqueda** (la barra se vacía y aparece un chip 🔎 que podés quitar). Clic en tu **nombre/foto** del topbar → te lleva a tu perfil.
 
 ## Probar con Postman (lo que pide el inge)
-1. `POST localhost:3001/register` (body: `{"email":"a@a.com","password":"1234","nombre":"Yo"}`) → copia el `token`
+1. `POST localhost:3001/register` (body: `{"email":"a@a.com","password":"ClaveSegura123","nombre":"Yo"}`) → copia el `token`
 2. En Headers: `Authorization: Bearer <token>`
 3. `GET localhost:3002/feeds` / `POST localhost:3002/feeds` / `GET localhost:3002/feed` / `GET localhost:3002/articles/:id`
 4. `POST localhost:3003/summarize` (body: `{"titulo":"...","texto":"..."}`)
@@ -359,6 +405,10 @@ curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
 - **El trabajo de fondo respeta tu configuración**: clasificar y traducir al importar usan el motor del **dueño de las noticias**. Con "API externa" la **IA local no se usa** (no toca tu GPU); casilla opcional para habilitarla como respaldo
 - **Respuestas de la IA con formato** (negritas y viñetas reales, sin asteriscos sueltos) en resumen, preguntas y digest
 - **Barra de acciones fija** en el modal de la noticia (siempre visible, se puede ocultar) y sin mezclar respuestas si abrís otra noticia rápido
+- **Auditoría ISO 25010/25000**: SSRF, JWT_SECRET obligatorio, rate limits, validación de imágenes por contenido, CSP y cabeceras, límites de entrada y pruebas unitarias (`npm test`)
+- **Rendimiento**: consultas sin `contenido_html`, índices + WAL, caché de estadísticas y traducciones, clasificación/traducción por lotes y cola de inferencia con concurrencia limitada
+- **Cuantización**: modelos Q4 recomendados, caché KV `q8_0`, flash attention y `./portal.sh cuantizar` para convertir modelos propios
+- **Arquitectura modular**: `services/shared/` (seguridad y utilidades) y `services/agent/ai/` (IA separada de las rutas y del negocio)
 
 ### Pendiente (FALTA)
 - [ ] **OAuth 2.0 real** (`/authorize` con redirect y `/token`) — hoy es login directo con JWT

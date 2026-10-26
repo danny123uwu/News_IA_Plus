@@ -16,6 +16,15 @@ let filtroFuente = null; // {id, nombre} — portada de una fuente
 
 const $ = (id) => document.getElementById(id);
 
+// Avatar por defecto (data URI, sin depender de un archivo externo).
+const FOTO_DEFECTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90">' +
+  '<rect width="90" height="90" fill="#333"/><text x="45" y="55" text-anchor="middle" ' +
+  'fill="white" font-size="40">👤</text></svg>'
+);
+$('fotoTop').addEventListener('error', () => { $('fotoTop').style.display = 'none'; });
+$('fotoPerfil').addEventListener('error', () => { $('fotoPerfil').src = FOTO_DEFECTO; });
+
 // ---------- TEMA DE COLOR ----------
 // El tema se aplica con <body data-tema="..."> y se guarda en tu cuenta (y en
 // localStorage para que se vea al instante, incluso antes de iniciar sesión).
@@ -457,6 +466,7 @@ function cambiarModo(reg) {
   $('tabLogin').classList.toggle('active', !reg);
   $('tabRegister').classList.toggle('active', reg);
   $('nombre').classList.toggle('oculto', !reg);
+  $('password').minLength = reg ? 8 : 0;
   $('btnAuth').textContent = reg ? 'Crear cuenta' : 'Entrar';
   $('authError').textContent = '';
 }

@@ -25,7 +25,7 @@
     <form id="formAuth">
       <input type="text" id="nombre" placeholder="Tu nombre" class="oculto" />
       <input type="email" id="email" placeholder="Correo" required />
-      <input type="password" id="password" placeholder="Contraseña" required />
+      <input type="password" id="password" placeholder="Contraseña (mín. 8 al crear cuenta)" maxlength="200" required />
       <button type="submit" id="btnAuth">Entrar</button>
     </form>
     <p id="authError" class="error"></p>
@@ -46,7 +46,7 @@
           <select id="temaTop" aria-label="Tema de color"></select>
         </label>
         <button id="btnPerfilTop" class="perfil-top" title="Ver mi perfil">
-          <img id="fotoTop" class="avatar" src="" alt="" onerror="this.style.display='none'" />
+          <img id="fotoTop" class="avatar" src="" alt="" />
           <span id="nombreTop"></span>
         </button>
         <button id="btnSalir" class="btn-icono btn-salir" title="Salir (cerrar sesión)" aria-label="Salir">
@@ -129,7 +129,7 @@
         <div class="card-form">
           <h3><span class="ico">👤</span> Mi perfil</h3>
           <div class="perfil-fila">
-            <img id="fotoPerfil" class="avatar-grande" src="" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22><rect width=%2290%22 height=%2290%22 fill=%22%23333%22/><text x=%2245%22 y=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>👤</text></svg>'" />
+            <img id="fotoPerfil" class="avatar-grande" src="" alt="" />
             <div>
               <input type="text" id="perfilNombre" placeholder="Tu nombre" />
               <input type="file" id="perfilFoto" accept="image/*" />

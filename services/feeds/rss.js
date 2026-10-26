@@ -25,7 +25,11 @@
 //  Devuelve siempre la URL REAL del feed, para guardarla en la base de datos.
 // ============================================================================
 
+const http = require('node:http');
+const https = require('node:https');
+const zlib = require('node:zlib');
 const Parser = require('rss-parser');
+const { validarUrlPublica, lookupSeguro } = require('../shared/url-segura');
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -35,6 +39,7 @@ const CABECERAS = {
   Accept: 'application/rss+xml, application/atom+xml, application/rdf+xml;q=0.9, ' +
     'application/xml;q=0.9, text/xml;q=0.9, text/html;q=0.8, application/json;q=0.7, */*;q=0.6',
   'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate',
   'Cache-Control': 'no-cache',
   Pragma: 'no-cache'
 };
@@ -248,47 +253,149 @@ function hostDe(url) {
 }
 
 // ---------- descarga --------------------------------------------------------
-async function bajar(url, { timeout = 12000 } = {}) {
-  let r;
-  try {
-    r = await fetch(url, {
-      redirect: 'follow',
+const MAX_REDIRECCIONES = 5;
+
+/**
+ * Una sola petición HTTP(S) con:
+ *   · validación SSRF de la URL y de la IP en el momento de conectar
+ *   · tope de bytes mientras se descarga (aunque no haya Content-Length)
+ *   · descompresión transparente de gzip/deflate/br
+ * Devuelve { redireccion } o { estado, tipo, buf, urlFinal }.
+ */
+function unaDescarga(url, timeout, maxBytes) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try {
+      // new URL es síncrono; la validación de IP se hace en lookupSeguro.
+      u = new URL(url);
+    } catch {
+      return reject(new Error('dirección inválida'));
+    }
+    const lib = u.protocol === 'https:' ? https : http;
+    let terminado = false;
+    const terminar = (fn, valor) => {
+      if (terminado) return;
+      terminado = true;
+      fn(valor);
+    };
+
+    const req = lib.request(u, {
+      method: 'GET',
       headers: CABECERAS,
-      signal: AbortSignal.timeout(timeout)
+      lookup: lookupSeguro,
+      timeout
+    }, (res) => {
+      const estado = res.statusCode || 0;
+      const ubicacion = res.headers.location;
+      if ([301, 302, 303, 307, 308].includes(estado) && ubicacion) {
+        try { res.resume(); } catch {}
+        let destino;
+        try { destino = new URL(ubicacion, u).href; } catch { destino = ''; }
+        return terminar(resolve, { redireccion: destino });
+      }
+
+      let flujo = res;
+      const codificacion = String(res.headers['content-encoding'] || '').toLowerCase();
+      try {
+        if (codificacion === 'gzip') flujo = res.pipe(zlib.createGunzip());
+        else if (codificacion === 'deflate') flujo = res.pipe(zlib.createInflate());
+        else if (codificacion === 'br') flujo = res.pipe(zlib.createBrotliDecompress());
+      } catch (e) {
+        return terminar(reject, e);
+      }
+
+      const trozos = [];
+      let total = 0;
+      let cortado = false;
+
+      const cortar = () => {
+        cortado = true;
+        try { req.destroy(); } catch {}
+        try { flujo.destroy(); } catch {}
+      };
+
+      flujo.on('data', (trozo) => {
+        if (cortado) return;
+        total += trozo.length;
+        if (total > maxBytes) return cortar();
+        trozos.push(trozo);
+      });
+      flujo.on('end', () => {
+        terminar(resolve, {
+          estado,
+          tipo: String(res.headers['content-type'] || ''),
+          buf: Buffer.concat(trozos, Math.min(total, maxBytes)).subarray(0, maxBytes),
+          urlFinal: u.href,
+          cortado
+        });
+      });
+      flujo.on('error', (e) => {
+        if (cortado) {
+          return terminar(resolve, { estado, tipo: String(res.headers['content-type'] || ''), buf: Buffer.concat(trozos), urlFinal: u.href, cortado: true });
+        }
+        terminar(reject, e);
+      });
     });
-  } catch (e) {
-    const lento = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
-    throw new ErrorFeed(lento ? 'tiempo' : 'red',
-      lento
-        ? 'El sitio ' + hostDe(url) + ' tardó demasiado en responder (más de ' + Math.round(timeout / 1000) + ' s).'
-        : 'No se pudo conectar con ' + hostDe(url) + '. Revisá la dirección o tu conexión.',
-      { url, causa: e.message });
-  }
 
-  const tipo = r.headers.get('content-type') || '';
-  const largo = Number(r.headers.get('content-length') || 0);
-  if (largo > MAX_BYTES) {
-    try { await r.body?.cancel(); } catch {}
-    throw new ErrorFeed('grande', 'La respuesta de ' + hostDe(url) + ' es demasiado grande.', { url, estado: r.status });
-  }
+    req.on('timeout', () => {
+      const e = new Error('tiempo de espera agotado');
+      e.name = 'TimeoutError';
+      req.destroy(e);
+    });
+    req.on('error', (e) => {
+      if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) return terminar(reject, e);
+      terminar(reject, e);
+    });
+    req.end();
+  });
+}
 
-  let buf;
+async function bajar(url, { timeout = 12000 } = {}) {
+  let actual = String(url || '');
+  let redirecciones = 0;
+  let r = null;
+
   try {
-    buf = Buffer.from(await r.arrayBuffer());
+    while (true) {
+      // Valida protocolo, credenciales, dominio e IPs resueltas.
+      await validarUrlPublica(actual);
+      r = await unaDescarga(actual, timeout, MAX_BYTES);
+      if (!r.redireccion) break;
+      redirecciones++;
+      if (redirecciones > MAX_REDIRECCIONES) {
+        throw new ErrorFeed('redireccion', 'El sitio ' + hostDe(url) + ' redirige demasiadas veces.', { url });
+      }
+      if (!/^https?:\/\//i.test(r.redireccion)) {
+        throw new ErrorFeed('redireccion', 'El sitio ' + hostDe(url) + ' redirige a una dirección no permitida.', { url });
+      }
+      actual = r.redireccion;
+    }
   } catch (e) {
-    throw new ErrorFeed('red', 'Se cortó la descarga de ' + hostDe(url) + '.', { url, causa: e.message });
+    if (e instanceof ErrorFeed) throw e;
+    const lento = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    const interna = /red interna|no permitida|no se pudo resolver|dirección inválida/i.test(String(e && e.message));
+    throw new ErrorFeed(interna ? 'bloqueado' : (lento ? 'tiempo' : 'red'),
+      interna
+        ? 'Esa dirección no está permitida (apunta a una red interna o no es un dominio público).'
+        : lento
+          ? 'El sitio ' + hostDe(actual) + ' tardó demasiado en responder (más de ' + Math.round(timeout / 1000) + ' s).'
+          : 'No se pudo conectar con ' + hostDe(actual) + '. Revisá la dirección o tu conexión.',
+      { url: actual, causa: e.message });
   }
-  if (buf.length > MAX_BYTES) buf = buf.subarray(0, MAX_BYTES);
 
-  const texto = decodificar(buf, tipo);
+  if (r.cortado) {
+    throw new ErrorFeed('grande', 'La respuesta de ' + hostDe(actual) + ' es demasiado grande.', { url: actual, estado: r.estado });
+  }
+
+  const texto = decodificar(r.buf, r.tipo);
   return {
-    url,
-    urlFinal: r.url || url,
-    estado: r.status,
-    tipo,
+    url: actual,
+    urlFinal: r.urlFinal || actual,
+    estado: r.estado,
+    tipo: r.tipo,
     texto,
     esXml: pareceXml(texto),
-    esHtml: pareceHtml(texto, tipo)
+    esHtml: pareceHtml(texto, r.tipo)
   };
 }
 
