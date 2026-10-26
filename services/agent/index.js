@@ -14,7 +14,7 @@ const {
   cabecerasSeguridad, corsPortal, crearLimitador, recortar
 } = require('../shared/http');
 
-const { getConfig, setConfig, configVisible, PROVEEDORES, sanearBaseUrl } = require('./config');
+const { getConfig, setConfig, configVisible, PROVEEDORES, combinarApi } = require('./config');
 const { listarModelos, disponible, jalarModelo, estado } = require('./ai/ollama');
 const { RECOMENDADOS, NOMBRE_MODELO, recomendar } = require('./ai/models');
 const { listarModelosApi } = require('./ai/providers');
@@ -158,10 +158,7 @@ function configDePrueba(base, b) {
   };
   if (b.motor === 'local' || b.motor === 'api') cfg.motor = b.motor;
   if (b.api && typeof b.api === 'object') {
-    if (typeof b.api.proveedor === 'string' && b.api.proveedor) cfg.api.proveedor = b.api.proveedor;
-    if (typeof b.api.baseUrl === 'string') cfg.api.baseUrl = sanearBaseUrl(b.api.baseUrl);
-    if (typeof b.api.modelo === 'string') cfg.api.modelo = b.api.modelo.trim().slice(0, 120);
-    if (typeof b.api.key === 'string' && b.api.key.trim()) cfg.api.key = b.api.key.trim().slice(0, 400);
+    cfg.api = combinarApi(base.api, b.api);
   }
   cfg.modelos.clasificar = recortar(cfg.modelos.clasificar, 120);
   cfg.modelos.resumir = recortar(cfg.modelos.resumir, 120);
@@ -171,13 +168,16 @@ function configDePrueba(base, b) {
 app.post('/config/test', auth, limiteGeneral, limitePrueba, async (req, res) => {
   const t0 = Date.now();
   const b = req.body || {};
-  const cfg = configDePrueba(getConfig(uidDe(req)), b);
   try {
+    const cfg = configDePrueba(getConfig(uidDe(req)), b);
+    // Una prueba de API no debe mostrar éxito gracias a Ollama de respaldo.
+    cfg.respaldoLocal = false;
     const { texto, motor, ms } = await generar({
       prompt: 'Responde con exactamente una palabra: LISTO',
       system: 'Contesta con una sola palabra, sin puntuación.',
       tarea: 'resumir',
-      cfg
+      cfg,
+      signal: corteDeCliente(res)
     });
     res.json({ ok: true, motor, ms: ms || Date.now() - t0, respuesta: String(texto).slice(0, 120) });
   } catch (e) {
@@ -188,12 +188,10 @@ app.post('/config/test', auth, limiteGeneral, limitePrueba, async (req, res) => 
 app.post('/config/models', auth, limiteGeneral, limitePrueba, async (req, res) => {
   const b = req.body || {};
   const guardada = getConfig(req.user.id).api;
-  const baseUrl = sanearBaseUrl(b.baseUrl || guardada.baseUrl || '');
-  const key = (b.key && String(b.key).trim().slice(0, 400)) || guardada.key;
-  const proveedor = b.proveedor || guardada.proveedor;
-  if (proveedor !== 'gemini' && !baseUrl) return res.status(400).json({ error: 'Falta la URL base de la API' });
-  if (!key) return res.status(400).json({ error: 'Falta la API key' });
   try {
+    const { baseUrl, key, proveedor } = combinarApi(guardada, b);
+    if (proveedor !== 'gemini' && !baseUrl) return res.status(400).json({ error: 'Falta la URL base de la API' });
+    if (!key) return res.status(400).json({ error: 'Falta la API key del proveedor seleccionado' });
     let modelos = await listarModelosApi(baseUrl, key, proveedor);
     modelos = modelos
       .filter((id) => !/embed|embedding|aqa|imagen|image-generation|veo|tts|whisper|moderation/i.test(id))

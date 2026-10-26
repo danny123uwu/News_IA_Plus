@@ -22,9 +22,10 @@ async function generar({ prompt, system, tarea = 'resumir', cfg, prioridad = 0, 
     if (!apiLista(cfg)) throw new Error('Falta la API key (o la URL) del proveedor externo');
     const t0 = Date.now();
     try {
-      const texto = await apiExterna(cfg.api, prompt, system);
+      const texto = await apiExterna(cfg.api, prompt, system, signal);
       return { texto, motor: 'api:' + cfg.api.proveedor + (cfg.api.modelo ? ':' + cfg.api.modelo : ''), ms: Date.now() - t0 };
     } catch (e) {
+      if (signal?.aborted) throw e;
       errorApi = e;
       // La IA local solo entra si el usuario la habilitó como respaldo.
       if (cfg.respaldoLocal !== true || !(await disponible())) throw e;

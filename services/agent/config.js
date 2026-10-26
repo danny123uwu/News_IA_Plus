@@ -97,15 +97,34 @@ function setConfig(id, c) {
     if (typeof c.modelos.resumir === 'string') cfg.modelos.resumir = c.modelos.resumir.slice(0, 120);
   }
   if (c.api && typeof c.api === 'object') {
-    if (c.api.proveedor && PROVEEDORES[c.api.proveedor]) cfg.api.proveedor = c.api.proveedor;
-    if (typeof c.api.baseUrl === 'string') cfg.api.baseUrl = sanearBaseUrl(c.api.baseUrl);
-    if (typeof c.api.modelo === 'string') cfg.api.modelo = c.api.modelo.trim().slice(0, 120);
-    if (typeof c.api.key === 'string' && c.api.key.trim()) cfg.api.key = c.api.key.trim().slice(0, 400);
+    cfg.api = combinarApi(cfg.api, c.api);
   }
   const todas = leerConfigs();
   todas['u' + id] = cfg;
   guardarConfigs(todas);
   return cfg;
+}
+
+// Nunca enviar la clave guardada de un proveedor a otro dominio/proveedor.
+// Un campo vacío conserva la clave solo si el destino sigue siendo el mismo.
+function combinarApi(base, cambios = {}) {
+  const proveedor = cambios.proveedor || base.proveedor;
+  if (!Object.hasOwn(PROVEEDORES, proveedor)) throw new Error('Proveedor de API inválido');
+  const cambioProveedor = proveedor !== base.proveedor;
+  const defecto = PROVEEDORES[proveedor];
+  const baseUrl = typeof cambios.baseUrl === 'string'
+    ? sanearBaseUrl(cambios.baseUrl)
+    : (cambioProveedor ? defecto.url : base.baseUrl);
+  const origen = (url) => { try { return new URL(url).origin; } catch { return ''; } };
+  const cambioDestino = origen(baseUrl || defecto.url) !== origen(base.baseUrl || PROVEEDORES[base.proveedor]?.url);
+  return {
+    ...base, proveedor, baseUrl,
+    modelo: typeof cambios.modelo === 'string' ? cambios.modelo.trim().slice(0, 120)
+      : (cambioProveedor ? defecto.modelo : base.modelo),
+    key: typeof cambios.key === 'string' && cambios.key.trim()
+      ? cambios.key.trim().slice(0, 400)
+      : (cambioProveedor || cambioDestino ? '' : base.key)
+  };
 }
 
 function configVisible(cfg) {
@@ -125,5 +144,6 @@ module.exports = {
   getConfig,
   setConfig,
   configVisible,
+  combinarApi,
   sanearBaseUrl
 };

@@ -476,3 +476,19 @@ GPU no significa CPU al 0 %: tokenización, carga y parte del procesamiento
 siguen usando CPU. Comprobá `ollama ps` durante una generación (en Docker:
 `docker compose exec ollama ollama ps`) y las capas GPU en los logs. La GPU
 en reposo puede marcar 0 % y `ollama ps` vacío no indica un fallo.
+
+## Comprobar una API externa
+
+En **⚙️ IA → API externa**, elegí proveedor, ingresá su clave, pulsá
+**Ver modelos**, seleccioná uno y pulsá **Probar conexión**. Solo después de
+una respuesta correcta guardá la configuración. La prueba no guarda cambios
+ni usa Ollama de respaldo para aparentar una conexión exitosa.
+
+Claude usa la API nativa de Anthropic; Gemini usa la API nativa de Google.
+OpenAI, Groq, DeepSeek, OpenRouter y Personalizado usan el protocolo OpenAI.
+Al cambiar de proveedor o dominio no se reutiliza la clave anterior.
+Los errores 401/403 indican problemas de acceso y 429 indica cuota o límites.
+
+`npm test` incluye pruebas **simuladas** de los siete proveedores, listado de
+modelos, errores y cancelación. No comprueba el saldo ni la validez de claves
+reales: eso requiere la prueba de conexión con la cuenta del usuario.

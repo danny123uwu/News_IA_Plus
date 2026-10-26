@@ -1595,7 +1595,20 @@ document.querySelectorAll('input[name=motorIA]').forEach((r) => r.addEventListen
   $('iaApiCaja').classList.toggle('oculto', r.value !== 'api');
   if (r.value === 'api' && !$('iaBaseUrl').value) aplicarProveedor(true);
 }));
-$('iaProveedor').addEventListener('change', () => { aplicarProveedor(true); if ($('iaModeloLista')) { $('iaModeloLista').innerHTML = '<option value="">— elegí un modelo —</option>'; $('iaModeloLista').classList.add('oculto'); } });
+$('iaProveedor').addEventListener('change', () => {
+  aplicarProveedor(true);
+  // Una clave que se estaba escribiendo tampoco debe viajar a otro proveedor.
+  $('iaKey').value = '';
+  const apiGuardada = iaData && iaData.config.api;
+  $('iaKey').placeholder = apiGuardada && apiGuardada.proveedor === $('iaProveedor').value && apiGuardada.keyGuardada
+    ? 'Key guardada: ' + apiGuardada.keyFinal + ' (vacío = no cambiar)'
+    : 'API key del proveedor seleccionado';
+  $('iaApiMsg').textContent = '';
+  if ($('iaModeloLista')) {
+    $('iaModeloLista').innerHTML = '<option value="">— elegí un modelo —</option>';
+    $('iaModeloLista').classList.add('oculto');
+  }
+});
 
 $('btnGuardarIA').addEventListener('click', async () => {
   try {
