@@ -56,8 +56,26 @@ ESPERAR=90   # segundos máximos que espera a que el sistema responda
 
 pausa() { read -rp "Enter para volver al menú... " _; }
 
+# La primera puesta en marcha se prepara desde el menú, sin pasos manuales.
+# Una configuración existente nunca se sobrescribe.
+preparar_env() {
+  [ -f .env ] && return 0
+  local secreto
+  if command -v openssl >/dev/null 2>&1; then
+    secreto=$(openssl rand -hex 32) || return 1
+  elif command -v node >/dev/null 2>&1; then
+    secreto=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") || return 1
+  else
+    echo "Para preparar .env instalá openssl o crealo desde .env.example con una clave propia."
+    return 1
+  fi
+  (umask 077; sed "s/^JWT_SECRET=.*/JWT_SECRET=$secreto/" .env.example > .env) || return 1
+  echo "Configuración inicial preparada. Tus claves no se muestran."
+}
+
 # ---------------------------------------------------------------- INICIAR ---
 iniciar() {
+  preparar_env || return 1
   echo "==> Motor de modelos: $MODO_IA"
   echo -e "${AZUL}==> Construyendo la imagen de los servicios…${SIN}"
   # Se construye UNA sola vez (todos los servicios comparten la misma imagen);
@@ -128,6 +146,7 @@ seleccionar_motor() {
   case "${1:-estado}" in
     estado) echo "Motor seleccionado: $MODO_IA" ;;
     host|docker)
+      preparar_env || return 1
       local elegido="$1"
       if grep -q '^OLLAMA_MODO=' .env 2>/dev/null; then
         sed -i "s/^OLLAMA_MODO=.*/OLLAMA_MODO=$elegido/" .env
@@ -176,6 +195,7 @@ activar_gpu() {
     echo "El modo host no necesita NVIDIA Container Toolkit. Revisá: ollama ps"
     return 0
   fi
+  preparar_env || return 1
   if [ -x scripts/setup-gpu.sh ]; then
     bash scripts/setup-gpu.sh
   else
@@ -213,38 +233,45 @@ borrar_todo() {
 # ------------------------------------------------------------------ MENÚ ---
 menu() {
   while true; do
+    if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then clear; fi
     echo
     echo -e "${AZUL}================================================================${SIN}"
     echo -e "${AZUL}   Portal IA News — lanzador${SIN}"
     echo -e "${AZUL}================================================================${SIN}"
     dc ps --format 'table {{.Name}}\t{{.Status}}' 2>/dev/null
     echo
+    echo "  APLICACIÓN"
     echo "  1) Iniciar / actualizar      (construye y levanta)"
     echo "  2) Detener                   (apaga, conserva datos)"
     echo "  3) Reiniciar"
     echo "  4) Ver estado"
     echo "  5) Ver logs en vivo"
+    echo
+    echo "  INTELIGENCIA ARTIFICIAL"
     echo "  6) Descargar modelos de IA recomendados"
-    echo "  7) Eliminar contenedores, modelos e imagen (conserva datos)"
-    echo "  8) BORRAR TODO (incluye la base de datos)   <-- peligroso"
-    echo "  9) Activar GPU para la IA (NVIDIA)"
-    echo " 10) Cuantizar un modelo (Q4, menos VRAM)"
-    echo " 11) Elegir motor: Ollama del sistema o Docker"
+    echo "  7) Elegir motor: Ollama del sistema o Docker"
+    echo "  8) Activar GPU para la IA (NVIDIA)"
+    echo "  9) Cuantizar un modelo (Q4, menos VRAM)"
+    echo
+    echo "  LIMPIEZA (PIDE CONFIRMACIÓN)"
+    echo " 10) Eliminar contenedores, modelos e imagen (conserva datos)"
+    echo " 11) BORRAR TODO (incluye la base de datos)   <-- peligroso"
+    echo
     echo "  0) Salir"
     echo
     read -rp "Opción: " op
     case "$op" in
-      1) iniciar ;;
-      2) detener ;;
-      3) reiniciar ;;
+      1) iniciar; pausa ;;
+      2) detener; pausa ;;
+      3) reiniciar; pausa ;;
       4) estado; pausa ;;
       5) echo "Elegí un servicio (auth/feeds/agente/web/nginx/ollama) o vacío para todos:"; read -rp "servicio: " s; ver_logs "$s" ;;
-      6) bajar_modelos ;;
-      7) eliminar; pausa ;;
-      8) borrar_todo; pausa ;;
-      9) activar_gpu; pausa ;;
-      10) echo "Modelo a cuantizar (Enter = qwen2.5:3b):"; read -rp "modelo: " m; cuantizar_modelos "${m:-qwen2.5:3b}"; pausa ;;
-      11) read -rp "Motor (host/docker): " m; seleccionar_motor "$m"; pausa; exec "$0" ;;
+      6) bajar_modelos; pausa ;;
+      7) read -rp "Motor (host/docker): " m; seleccionar_motor "$m"; pausa; exec "$0" ;;
+      8) activar_gpu; pausa ;;
+      9) echo "Modelo a cuantizar (Enter = qwen2.5:3b):"; read -rp "modelo: " m; cuantizar_modelos "${m:-qwen2.5:3b}"; pausa ;;
+      10) eliminar; pausa ;;
+      11) borrar_todo; pausa ;;
       0|q) exit 0 ;;
       *) echo -e "${ROJO}Opción inválida.${SIN}" ;;
     esac
