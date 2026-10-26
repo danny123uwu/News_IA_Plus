@@ -164,11 +164,8 @@ recortes en **`feeds.db`**. El Agente guarda las preferencias de IA en
 
 ## 🔧 Errores comunes y soluciones (Troubleshooting)
 
-Esta sección recupera los casos documentados durante el desarrollo, incluyendo
-los del README anterior, y añade los cambios posteriores. Cada caso explica
-**síntoma → causa → solución → cómo comprobarlo** cuando corresponde.
-Los mensajes citados del historial **no son logs nuevos ni pruebas repetidas
-en esta revisión**. Las comprobaciones de ejecución están en [Resultados de pruebas](docs/verificacion.md).
+Problemas encontrados durante el desarrollo y sus soluciones, organizados por
+componente. Cada caso incluye el síntoma, la causa y los pasos para resolverlo.
 
 ### 🐳 Docker y arranque
 
