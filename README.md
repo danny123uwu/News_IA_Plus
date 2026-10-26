@@ -162,54 +162,229 @@ recortes en **`feeds.db`**. El Agente guarda las preferencias de IA en
 > `data/` y `.env` son privados: contienen bases, fotos y claves. **No se suben
 > al repositorio.** Apagar el portal conserva los datos y los modelos descargados.
 
-## 🔧 Errores comunes y soluciones
+## 🔧 Errores comunes y soluciones (Troubleshooting)
 
-Los problemas encontrados durante el desarrollo y cómo resolverlos, sin tener
-que revisar todo el código.
+Esta sección recupera los casos documentados durante el desarrollo, incluyendo
+los del README anterior, y añade los cambios posteriores. Cada caso explica
+**síntoma → causa → solución → cómo comprobarlo** cuando corresponde.
+Los mensajes citados del historial **no son logs nuevos ni pruebas repetidas
+en esta revisión**. Las comprobaciones de ejecución están en [Resultados de pruebas](docs/verificacion.md).
 
-### Arranque y Docker
+### 🐳 Docker y arranque
 
-| Problema | Causa habitual | Solución |
-|---|---|---|
-| «Docker no está corriendo» | El motor está apagado. | Abrir Docker Desktop o iniciar Docker en Linux; volver al menú. |
-| «image already exists» al construir | Varios servicios intentan construir la misma imagen. | Usar el lanzador: construye una sola vez. A mano: `docker compose build web` y después `docker compose up -d`. |
-| Puerto 80 ocupado | Otro servidor usa el puerto. | Liberarlo o usar el arranque sin Docker en :8090; no cerrar procesos de otros proyectos sin comprobarlos. |
-| El código actualizado no aparece | La imagen o el navegador conservan la versión anterior. | Elegir **Iniciar / actualizar** y recargar con **Ctrl+Shift+R**. |
-| «node/npm no se reconoce» en Windows | Node no está instalado o no está en PATH. | Instalar Node 24 LTS y volver a abrir la consola o el lanzador. |
+**1. La construcción falla con `image ... already exists` / `AlreadyExists`**
+- **Síntoma:** al construir varios servicios, Docker informa que la imagen ya existe.
+- **Causa documentada:** Auth, Feeds, Agente y Web comparten la misma imagen; varias construcciones en paralelo podían intentar etiquetarla a la vez.
+- **Solución:** usar **Iniciar / actualizar** del menú. A mano, ejecutar `docker compose build web` una sola vez y después `docker compose up -d`.
+- **Comprobación:** consultar el estado de los servicios y abrir el portal; no basta con que la construcción termine.
 
-### Conexión, noticias y datos
+**2. `permission denied` o «El servicio de Docker no está corriendo»**
+- **Causa:** Docker está apagado o el usuario no tiene permiso para acceder a su socket.
+- **Solución en Linux:** comprobar `systemctl status docker`; si corresponde, iniciar con `sudo systemctl start docker`. Si el problema es el grupo, configurar el acceso y volver a iniciar sesión. El grupo `docker` concede privilegios elevados.
+- **En Windows:** abrir Docker Desktop con contenedores Linux antes de seleccionar la opción Docker.
 
-| Problema | Causa habitual | Solución |
-|---|---|---|
-| «502 Bad Gateway» | Un servicio todavía no arrancó o está reiniciándose. | Revisar **Estado** y **Logs** desde el menú. Nginx ya actualiza los nombres internos de Docker. |
-| 404 al llamar a una API del portal | Se mezcló la dirección con proxy y la dirección nativa. | Docker: `localhost/auth/...`; sin Docker: `localhost:3001/...`. [Ejemplos](docs/api.md). |
-| Un portal no agrega noticias | URL sin RSS, bloqueo del medio o XML defectuoso. | El proyecto busca el RSS y tolera ciertos errores XML; si no lo encuentra, pegar el feed oficial o probar otra fuente. |
-| Error de permisos tras borrar `data/` | Docker creó la carpeta con otro propietario. | Volver a iniciar desde el lanzador; `init-datos` prepara sus permisos. No borrar datos mientras el portal está activo. |
-| Aparecen archivos `.db-wal` o `.db-shm` | SQLite está trabajando. | Son normales y están ignorados por Git; no borrarlos con la aplicación encendida. |
+**3. Los contenedores se levantan solos al prender la PC**
+- **Causa:** la política de reinicio de Docker.
+- **Solución:** el proyecto usa `RESTART_POLICY=no`. Para cambiarla voluntariamente, editar `.env` y volver a aplicar el despliegue; `unless-stopped` permite reinicio automático.
+- **Aclaración:** el servicio Ollama instalado en el sistema tiene su propia política; apagar el portal no la modifica.
 
-### Inteligencia artificial
+**4. `address already in use` / puerto 80 ocupado**
+- **Causa:** otro servidor ya utiliza el puerto publicado por Nginx.
+- **Solución:** identificar el proceso con `sudo lsof -i :80`, sin detener servicios ajenos a ciegas. Como alternativa, ejecutar con Node en :8090 o cambiar el mapeo de Nginx a `8080:80`.
+- **Comprobación:** con ese mapeo la dirección pasa a ser `http://localhost:8080`. El lanzador tiene la dirección :80 predeterminada; sus mensajes de URL no se ajustan automáticamente.
 
-| Problema | Causa habitual | Solución |
-|---|---|---|
-| El resumen indica «reglas» | No hay modelo disponible o falló el motor. | Leer el aviso; descargar un modelo, encender Ollama o configurar una API. |
-| Mucha CPU o respuesta lenta | Inferencia en CPU, carga del modelo o trabajo en curso. | Revisar `ollama ps` durante la generación y la configuración GPU. Cerrar el panel cancela el resumen/pregunta. |
-| GPU al 0 % en reposo | No hay generación activa o el modelo se descargó de memoria. | Comprobar durante una respuesta, no solo después; por defecto se libera a los 30 segundos. |
-| Ollama del sistema no conecta desde Docker | Solo escucha en `127.0.0.1`. | Configurar una dirección accesible y protegerla con firewall. [Guía](docs/ejecucion.md#ollama-del-sistema). |
-| API devuelve 401/403 | Clave incorrecta o falta de permisos. | Revisar la clave del proveedor seleccionado y probar desde IA. |
-| API devuelve 404 | Modelo o URL no disponible. | Pulsar **Ver modelos**, elegir uno accesible y probar de nuevo. |
-| API devuelve 429 | Cuota agotada o límite de solicitudes. | Revisar saldo/cuota y esperar si es un límite temporal. |
-| La traducción no llega | El servicio externo no respondió o aplicó límites. | Reintentar; el portal dispone de servicios de respaldo. |
+**5. `node` o `npm` no se reconoce en Windows**
+- **Causa habitual:** falta Node o la consola no recibió su nueva variable PATH.
+- **Solución:** instalar Node.js 24 LTS, cerrar y volver a abrir la consola y comprobar `node --version` / `npm --version`.
+- **Alcance de prueba:** la ayuda y el menú de `portal.bat` se comprobaron con `cmd` de Wine. Sus instrucciones PowerShell y el arranque completo necesitan validación en Windows real; no están cubiertos por esa prueba del menú.
 
-### Lectura e interfaz
+**6. Actualicé el código, pero sigo viendo la versión anterior**
+- **Causa:** Docker ejecuta la copia incluida en la imagen, y el navegador puede conservar recursos anteriores.
+- **Solución:** **Iniciar / actualizar** para reconstruir la imagen; después **Ctrl+Shift+R** en el navegador.
+- **Sin Docker:** reiniciar los procesos Node tras cambiar el backend; no hace falta reconstruir una imagen.
 
-- **Respuestas que se mezclaban al cambiar de noticia:** cada lectura invalida
-  las respuestas anteriores; el panel lateral evita mover el artículo.
-- **Acciones que desaparecían al bajar:** los botones quedan en una barra fija
-  dentro del modal, que también se puede plegar.
-- **Temas que se perdían al cambiar de equipo:** se guardan en el perfil,
-  además de aplicarse en el navegador.
-- **Recortes con error SQL:** se corrigió la consulta de la fuente y el manejo
-  de valores vacíos al guardar el fragmento.
+### 🌐 Nginx y conexión entre servicios
+
+**7. `502 Bad Gateway` después de recrear un contenedor**
+- **Causa histórica:** Nginx podía conservar una IP anterior al recrear el servicio.
+- **Cambio realizado:** `deploy/nginx/default.conf` utiliza el DNS interno `127.0.0.11`, resolución con vigencia de 10 segundos y destinos mediante variables.
+- **Si aparece ahora:** consultar **Estado** y **Logs**. Un servicio apagado o que falla al arrancar también produce 502; no todo 502 significa un problema de DNS.
+- **Comprobación:** `docker compose ps` y `docker compose logs --tail 40 agente` (o el servicio afectado).
+
+**8. `/auth`, `/feeds` o `/agente` responde 404**
+- **Causa:** mezclar las rutas del proxy con los puertos de ejecución nativa.
+- **Con Docker:** `http://localhost/auth/me` llega a Auth a través de Nginx.
+- **Sin Docker:** la misma ruta se consulta como `http://localhost:3001/me`.
+- **Detalle de Feeds:** la lista pública de fuentes es `/feeds/feeds`; el primer segmento es el prefijo de Nginx. [Ver rutas completas](docs/api.md).
+
+### 🗄️ Base de datos y archivos
+
+**9. `EACCES: permission denied, mkdir '/app/data/uploads'` tras borrar `data/`**
+- **Causa documentada:** Docker creaba la carpeta montada como root, pero los servicios Node se ejecutan con UID/GID 1000.
+- **Cambio realizado:** `init-datos` prepara la carpeta y los permisos antes de iniciar Auth, Feeds y Agente.
+- **Solución:** volver a iniciar mediante el lanzador; no borrar la carpeta con el portal funcionando.
+- **Comprobación:** `ls -ld data data/uploads` y estado de los servicios Node. En equipos con otro UID, revisar los permisos del montaje, no aplicar permisos globales indiscriminadamente.
+
+**10. HTTP 500 al guardar un recorte**
+- **Causa histórica:** se utilizaba el nombre del medio sin obtenerlo en la consulta; un parámetro podía llegar como `undefined`, que `node:sqlite` no admite.
+- **Cambio realizado:** la consulta incorpora `JOIN sources` para obtener la fuente, y los campos opcionales se convierten a valores aceptados por SQLite.
+- **Comprobación:** guardar un fragmento desde una noticia y abrir **Archivados → Mis recortes**. Si falla, consultar los logs de Feeds antes de atribuirlo al mismo error antiguo.
+
+**11. Aparecen `.db-wal`, `.db-shm` o `.db-journal`**
+- **Causa:** archivos auxiliares del mecanismo de escritura de SQLite. WAL y SHM son normales en el modo utilizado por el proyecto.
+- **Solución:** no borrarlos mientras la base está abierta; están excluidos de Git. Para copiar los archivos de base manualmente, detener primero el portal.
+- **Importante:** un error de base bloqueada es un síntoma distinto; comprobar que no haya dos instancias trabajando sobre los mismos datos.
+
+**12. `data/` o `.env` aparece entre los archivos que se van a subir**
+- **Riesgo:** contienen bases personales, fotos, secretos y preferencias de API.
+- **Solución:** comprobar `.gitignore` y `git status` antes de publicar. Solo `.env.example` y el SQL de estructura pertenecen a la entrega pública.
+- **Si ya se publicaron claves:** ignorar el archivo después no elimina el secreto del historial; hay que revocar las claves expuestas y tratar ese historial por separado.
+
+### 🤖 Modelos locales, GPU y API externas
+
+**13. Ollama sigue ocupando RAM/VRAM después de responder**
+- **Causa:** el modelo permanece cargado durante su tiempo de conservación.
+- **Configuración del proyecto:** un modelo cargado a la vez y `OLLAMA_KEEP_ALIVE=30s`. Usar `0` solicita liberarlo inmediatamente al terminar; conservarlo más tiempo puede agilizar la siguiente respuesta.
+- **Comprobación:** `docker compose exec ollama ollama ps` mientras está cargado y después del tiempo configurado. No confundir memoria del proceso/caché con un modelo todavía activo.
+
+**14. La IA utiliza CPU aunque hay una NVIDIA disponible**
+- **Causas a distinguir:** Docker no tiene acceso a NVIDIA, no se aplicó la sobrecapa GPU, falta memoria para todas las capas o se está observando trabajo auxiliar de CPU.
+- **Solución:** comprobar durante una generación `docker compose exec ollama ollama ps` y los logs de Ollama. El lanzador Linux aplica `docker-compose.gpu.yml` cuando detecta el runtime NVIDIA.
+- **Comprobación real de este proyecto:** se observaron `100% GPU` y `29/29` capas en la RTX 3050. Tener CPU activa no demuestra que haya vuelto al modo CPU; la GPU también puede marcar 0 % en reposo.
+- **Instalación:** la opción GPU de Linux instala soporte en Arch/CachyOS y reinicia Docker. No repetirla solo porque la GPU esté desocupada; afecta también a otros proyectos.
+
+**15. Seleccioné API externa, pero el trabajo de fondo usa el modelo local**
+- **Causa histórica:** las tareas de Feeds llegaban con identidad de servicio, sin tomar la configuración del propietario de las noticias.
+- **Cambio realizado:** Feeds envía `userId` y el Agente utiliza esa configuración. No se activa el respaldo Ollama si el usuario lo dejó deshabilitado.
+- **Comprobación:** revisar el motor devuelto y la casilla **Usar IA local como respaldo**. Otro usuario o aplicación también puede estar utilizando Ollama; no atribuir todo su consumo a la misma cuenta.
+
+**16. Gemini: «el modelo … no existe o ya no está disponible»**
+- **Causa posible:** el proveedor retiró el modelo o la cuenta no tiene acceso; una URL incorrecta también puede dar 404.
+- **Cambio realizado:** la configuración migra ciertos nombres antiguos de Gemini al modelo de referencia del proyecto.
+- **Solución práctica:** **IA → Ver modelos**, seleccionar uno disponible para tu cuenta y **Probar API**. El nombre predeterminado no garantiza acceso ni cuota.
+
+**17. «Ver modelos» mostraba modelos de Gemini que fallaban al generar**
+- **Causa histórica:** se listaban desde la API nativa de Google, pero se generaba por su interfaz compatible con OpenAI; las capacidades expuestas no coincidían.
+- **Cambio realizado:** generación y listado de Gemini usan la API nativa; el listado filtra modelos que anuncian `generateContent`.
+- **Comprobación:** probar con la propia clave. Usar el mismo protocolo evita esa incompatibilidad, pero no elimina restricciones de permisos, región o cuota.
+
+**18. El desplegable de modelos no mostraba opciones**
+- **Causa histórica:** el uso de `datalist` no ofrecía un despliegue consistente entre navegadores.
+- **Cambio realizado:** se utiliza un `select` que se llena al pulsar **Ver modelos**.
+- **Si sigue vacío:** revisar el mensaje de la API y que se haya introducido la clave del proveedor seleccionado.
+
+**19. La traducción vuelve vacía o falla**
+- **Causa documentada:** un endpoint anterior de traducción por lotes no respondía desde algunas IPs. Los servicios gratuitos también pueden imponer límites o cambiar su comportamiento.
+- **Cambio realizado:** se utiliza otro endpoint de Google, caché y respaldos con MyMemory y, según la ruta/configuración, el motor de IA.
+- **Solución:** revisar el mensaje, reintentar sin lanzar muchas solicitudes y conservar el acceso al texto original. No se garantiza la disponibilidad de terceros.
+
+**20. El resumen muestra `**asteriscos**` en lugar de formato**
+- **Causa histórica:** se presentaba el Markdown del modelo como texto sin formato.
+- **Cambio realizado:** la interfaz interpreta negritas, viñetas y fragmentos de código en resúmenes, preguntas y digest.
+- **Comprobación:** revisar la respuesta en la interfaz, no solo el JSON del endpoint, donde el Markdown es esperable.
+
+**21. La respuesta indica `motor: "reglas"`**
+- **Causa posible:** no hay modelos descargados, Ollama está apagado, falló la API o la salida generada fue descartada.
+- **Caso observado:** el volumen del contenedor de Ollama estaba vacío. Los modelos del host no aparecen automáticamente en ese volumen.
+- **Solución:** leer el aviso y comprobar `docker compose exec ollama ollama list`. Descargar modelos desde el menú o configurar una API externa.
+- **Aclaración:** `reglas` es un respaldo automático, no una respuesta generada por un modelo. HTTP 200 por sí solo no demuestra que la IA haya funcionado.
+
+**22. Descargué otro modelo, pero parece que sigue utilizando el anterior**
+- **Causa histórica:** la selección automática quedaba fijada aunque cambiara la lista de modelos.
+- **Cambio realizado:** se actualiza la selección automática cuando cambia la lista instalada.
+- **Comprobación:** revisar el motor mostrado en la respuesta y **Modelos por tarea**. Un modelo elegido manualmente sigue teniendo prioridad sobre la selección automática.
+
+**23. «No se pudo conectar con el servidor» durante una generación larga**
+- **Caso observado:** hubo solicitudes lentas y un corte del cliente registrado como `499` en Nginx. `499` significa que el cliente cerró la conexión; no es, por sí solo, una caída del servidor.
+- **Cambio realizado:** cronómetro visible, cancelación al cerrar el panel, límite de espera de 150 segundos y propagación de la cancelación hacia Ollama.
+- **Diagnóstico:** correlacionar la hora del error con los logs de Nginx, Agente y Ollama; un problema de red real también puede producir el mensaje.
+- **Acción:** comprobar el motor activo y su rendimiento; no lanzar repetidamente la misma petición mientras otra sigue trabajando.
+
+**24. La IA repite una frase hasta llenar la respuesta**
+- **Causa posible:** la generación entró en un bucle; no implica que el artículo original contenga esa repetición.
+- **Cambio realizado:** penalización de repetición y detección heurística de salidas repetitivas en resúmenes, preguntas y traducciones locales.
+- **Resultado:** cuando se detecta, se descarta esa salida y se informa del respaldo correspondiente. La detección no sustituye revisar el contenido ni garantiza eliminar toda repetición.
+
+**25. El Ollama del sistema responde en el host, pero no desde Docker**
+- **Causa habitual en Linux:** escucha solo en `127.0.0.1`, que no es la interfaz accesible desde la red bridge del contenedor.
+- **Solución:** configurar una dirección alcanzable y `OLLAMA_HOST_URL`, restringiendo el acceso con firewall. [Pasos](docs/ejecucion.md#ollama-del-sistema).
+- **Protección:** el lanzador comprueba la conexión antes de detener el Ollama del contenedor. No abrir la API de modelos a Internet; no exige contraseña por defecto.
+
+**26. Cambié de proveedor, pero se reutilizaba la clave anterior**
+- **Causa detectada en revisión:** conservar la clave al cambiar la configuración podía enviarla a otro proveedor o dominio.
+- **Cambio realizado:** el backend no reutiliza la clave guardada si cambia el proveedor/destino; la interfaz también limpia la clave que se estaba escribiendo.
+- **Uso:** ingresar la clave específica del nuevo proveedor antes de listar modelos o probar. No pegar claves en capturas ni en mensajes de error públicos.
+
+**27. Claude aparecía como opción, pero se llamaba con el protocolo incorrecto**
+- **Causa detectada en el código:** se trataba Anthropic como una API compatible con OpenAI.
+- **Cambio realizado:** se utilizan `/messages`, `x-api-key`, la versión de API y el formato de respuesta nativos de Anthropic.
+- **Verificación disponible:** contratos con respuestas simuladas en las pruebas. Para confirmar una cuenta concreta hace falta su clave real; no se presenta esa simulación como una llamada facturada exitosa.
+
+**28. API responde 401, 403 o 429; o «Probar API» parecía funcionar gracias a Ollama**
+- **401/403:** revisar autenticación y permisos del proveedor. **429:** revisar límites de solicitudes o cuota/saldo.
+- **Cambio realizado en la prueba:** **Probar API** no recurre a Ollama para aparentar una conexión externa exitosa.
+- **Comprobación:** el resultado debe identificar el proveedor externo. La prueba no guarda cambios y no garantiza que todos los modelos de la cuenta estén habilitados.
+
+### 🖥️ Lectura e interfaz
+
+**29. Al abrir noticias rápido se mezclaba el contenido de dos artículos**
+- **Causa histórica:** una respuesta de traducción o IA llegaba cuando ya se estaba leyendo otro artículo.
+- **Cambio realizado:** se comprueba a qué lectura y solicitud pertenece cada respuesta asíncrona; cerrar o cambiar de noticia invalida las anteriores en esos flujos.
+- **Comprobación:** abrir otra noticia mientras hay una solicitud en curso y verificar que la respuesta no se inserte en la lectura equivocada.
+
+**30. El modal mostraba la página web original entera**
+- **Causa histórica:** el contenido se enriquecía extrayendo la web del medio.
+- **Cambio realizado:** se muestra el cuerpo proporcionado por el RSS con su multimedia admitida; no se copia la página completa.
+- **Uso:** si el RSS solo incluye un extracto, **Ver fuente ↗** lleva a la noticia original.
+
+**31. «Resumir / Preguntar» desaparecía al bajar, o la respuesta movía la lectura**
+- **Causa histórica:** las acciones y la respuesta estaban dentro del flujo de contenido.
+- **Cambio realizado:** barra de acciones fija al pie del modal y panel IA que entra desde la derecha sin cambiar la posición del artículo.
+- **Uso:** **Ocultar acciones** pliega los botones; Escape cierra primero el panel de IA y después el artículo.
+
+**32. El tema o la apariencia se perdía al cambiar de equipo**
+- **Causa histórica:** la preferencia solo se tomaba del almacenamiento del navegador.
+- **Cambio realizado:** se guardan en la cuenta los temas, tipografía, tamaños, colores y aros; el navegador los utiliza además para aplicarlos de inmediato.
+- **Comprobación:** volver a iniciar sesión con la misma cuenta. Si aparecen recursos antiguos después de actualizar, usar **Ctrl+Shift+R**.
+
+### 📰 Fuentes y feeds RSS
+
+**33. `Status code 404` / `Unexpected close tag…` al agregar un sitio que sí abre**
+- **Síntoma histórico:** una portada, como `https://laboratoriolinux.es/index.php`, abría en el navegador pero fallaba como fuente.
+- **Causa:** una página HTML no es un feed XML. La dirección podía no tener RSS en esa ruta, o el parser intentaba interpretar HTML como XML.
+- **Cambio realizado:** primero se reconoce si la respuesta ya es un feed; si no, se buscan enlaces RSS/Atom declarados y luego rutas comunes de WordPress, Joomla, Blogger y otros formatos compatibles.
+- **Resultado:** se guarda la URL real del feed y puede aparecer el aviso **feed detectado**. Si no existe o no se encuentra un feed, el sitio no se puede importar por este mecanismo.
+
+**34. El RSS trae XML defectuoso y no carga**
+- **Ejemplos documentados:** `&` sin escapar, `&nbsp;`, `<br>` mal cerrado, avisos de PHP antes de la raíz o basura después de `</rss>`.
+- **Cambio realizado:** limpieza previa, intento de parser estricto y tolerante y rescate de elementos cuando es posible. También se normalizan entidades de títulos y enlaces relativos.
+- **Comprobación:** `npm run test:feeds` incluye un XML defectuoso de prueba. No implica que cualquier documento roto se pueda recuperar por completo.
+
+**35. Un medio bloquea la descarga con HTTP 403**
+- **Causa posible:** protección anti-bot, restricciones del medio o rechazo de solicitudes automáticas.
+- **Cambio realizado:** la descarga envía User-Agent de navegador y cabeceras apropiadas para feeds, además de mensajes de error comprensibles.
+- **Acción:** usar el feed oficial si está disponible o elegir otra fuente. Esas cabeceras no garantizan evitar Cloudflare ni autorizan saltarse restricciones del medio.
+
+**36. Agregar una URL sin feed tarda bastante**
+- **Causa:** después de probar la URL inicial se buscan feeds declarados y varias rutas candidatas.
+- **Funcionamiento:** se prueban hasta cuatro candidatos en paralelo, con tiempos de espera acotados por solicitud. Las fases, redirecciones y tiempos de red influyen en el total.
+- **Acción:** esperar el resultado sin reenviar repetidamente la petición. No se promete un tiempo máximo global de 25 segundos; ese valor del README anterior no cubría todos los recorridos.
+
+### 📋 Comprobación rápida
+
+```bash
+./portal.sh estado
+./portal.sh logs agente
+docker compose logs --tail 40 feeds
+docker compose exec ollama ollama ps
+docker compose exec ollama ollama list
+curl http://localhost/agente/health
+npm run test:feeds
+```
+
+Los cuatro servicios Node declaran healthcheck; Nginx y Ollama no tienen que
+mostrar `healthy` para estar ejecutándose. Consultar también la ruta afectada:
+un healthcheck de proceso no demuestra por sí solo que una API externa funcione.
 
 ## ⌨️ Atajos opcionales
 
