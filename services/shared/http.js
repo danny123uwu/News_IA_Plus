@@ -21,7 +21,7 @@ function cabecerasSeguridad(req, res, next) {
   next();
 }
 
-function corsPortal() {
+function corsPortal({ credentials = false } = {}) {
   const permitidos = texto(
     'CORS_ORIGINS',
     'http://localhost:8090,http://127.0.0.1:8090'
@@ -31,6 +31,7 @@ function corsPortal() {
     const origen = req.headers.origin;
     if (origen && permitidos.includes(origen)) {
       res.setHeader('Access-Control-Allow-Origin', origen);
+      if (credentials) res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');

@@ -25,20 +25,21 @@
     "20-pregunta-ia-real.png",
     "21-digest-dia.png",
     "22-tema-claro.png",
-    "23-health-agente.png"
+    "23-health-agente.png",
+    "24-sesion-oauth-activa.png"
   ],
   "fecha": "2026-10-26",
   "pregunta_ia_real": true,
   "archivos": [
     {
       "archivo": "01-inicio-sesion.png",
-      "sha256": "8684e79a0bcb605c40cee5f4841069cc56bf2f5625277a64f4827651a0240e47",
+      "sha256": "396eef796c45799673ad3187081a6076b0fe09ec518e26f7d9bcfcb4291a8a43",
       "ancho": 1440,
       "alto": 914
     },
     {
       "archivo": "02-registro.png",
-      "sha256": "cd0fefec997fa1ca39f4d0d702f9e7334a9da0c468d09db5da05aae967a8b7d5",
+      "sha256": "3369d4294a7c91510b93801705f393305ce47990f75096ab2d258d94885b5e77",
       "ancho": 1440,
       "alto": 914
     },
@@ -165,6 +166,12 @@
     {
       "archivo": "23-health-agente.png",
       "sha256": "944fc8a635cabcdc30506fa3e951b0d49832390aa75f3d106fbd6de4413533d9",
+      "ancho": 1440,
+      "alto": 914
+    },
+    {
+      "archivo": "24-sesion-oauth-activa.png",
+      "sha256": "842d192ddf927be59a6c71de0389ab146de506bd1033c0d5877ed68f2883684e",
       "ancho": 1440,
       "alto": 914
     }

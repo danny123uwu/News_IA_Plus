@@ -1,0 +1,9 @@
+Prueba REAL con Firefox, Docker y Nginx.
+OK registro desde formulario y flujo OAuth PKCE completo en Firefox
+OK retorno limpio; token en sessionStorage y cookie de sesión invisible a JavaScript
+OK Auth, Feeds y Agente aceptan el access_token obtenido por OAuth (200/200/200)
+OK perfil del usuario autenticado visible sin alterar la interfaz de lectura
+OK logout y contraseña incorrecta comprobados desde la interfaz
+OK login posterior recorre nuevamente authorize/token y recupera la misma cuenta
+OK Nginx responde al proxy y no registra la query con el código OAuth
+Sin cookies, códigos, JWT ni contraseñas publicados.

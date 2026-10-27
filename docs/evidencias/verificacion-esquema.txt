@@ -1,6 +1,10 @@
-OK auth.users: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
-OK auth: índices coinciden
-OK feeds.sources: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
-OK feeds.articles: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
-OK feeds.clips: columnas, tipos, defaults y restricciones de columna coinciden; SQL sin filas
-OK feeds: índices coinciden
+Comparación estructural sin exportar datos: se crea el SQL publicado en memoria y se contrasta con PRAGMA de las bases reales.
+OK auth.oauth_codes: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK auth.oauth_sessions: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK auth.users: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK auth: tablas documentadas oauth_codes, oauth_sessions, users; todas existen en la base real (3 tablas totales)
+OK feeds.articles: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK feeds.clips: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK feeds.sources: columnas, tipos, defaults, PK, FK e índices coinciden; SQL con 0 filas
+OK feeds: tablas documentadas articles, clips, sources; todas existen en la base real (3 tablas totales)
+No se copiaron filas ni datos personales.

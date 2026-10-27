@@ -6,7 +6,7 @@ intereses y facilitar su comprensión mediante resúmenes, traducciones y
 preguntas sobre las noticias. Así podés consultar tus fuentes favoritas y
 mantenerte informado sin tener que visitar cada sitio por separado.
 
-**3 microservicios · JWT · RSS · Docker + Nginx · IA local o API externa**
+**3 microservicios · OAuth 2.0 + JWT · RSS · Docker + Nginx · IA local o API externa**
 
 ## 🚀 Cómo ejecutarlo
 
@@ -125,7 +125,7 @@ te permite comprobar si tu cuenta tiene acceso y cuota para el modelo elegido.
 
 | Servicio | Puerto | Qué hace |
 |---|---:|---|
-| **Auth** — `services/auth/` | 3001 | Registro, login con JWT, perfil, foto y preferencias. |
+| **Auth** — `services/auth/` | 3001 | Registro, login y autorización OAuth 2.0 con PKCE; perfil, foto y preferencias. Emite tokens de acceso JWT. |
 | **Feeds** — `services/feeds/` | 3002 | Fuentes RSS, noticias, prioridades, búsqueda, recortes y estadísticas. |
 | **Agente IA** — `services/agent/` | 3003 | Resúmenes, preguntas, clasificación, traducción y configuración de modelos. |
 | **Web** — `web/` | 8090 | Interfaz que utiliza el usuario. |
@@ -135,10 +135,10 @@ te permite comprobar si tu cuenta tiene acceso y cuota para el modelo elegido.
 flowchart TB
   U[Navegador] -->|HTTP :80| N[Nginx / proxy inverso]
   N -->|/| W[Web :8090]
-  N -->|/auth/| A[Auth :3001]
+  N -->|/auth/| A[Auth / OAuth 2.0 :3001]
   N -->|/feeds/| F[Feeds :3002]
   N -->|/agente/| I[Agente IA :3003]
-  A --> DB1[(auth.db / users)]
+  A --> DB1[(auth.db / usuarios, sesiones y códigos OAuth)]
   F --> DB2[(feeds.db / sources, articles, clips)]
   F -->|HTTP + JWT de servicio| I
   F --> RSS[Portales RSS / Atom]
@@ -153,9 +153,27 @@ flowchart TB
 van directamente por la red de Docker; no necesitan volver a pasar por Nginx.
 Sin Docker, el navegador utiliza los puertos locales de cada servicio.
 
+### 🔐 Autenticación y autorización OAuth 2.0
+
+Auth incorpora el servidor **`@node-oauth/oauth2-server`**. La aplicación utiliza
+**Authorization Code con PKCE S256**: no entrega un token directamente al
+ingresar la contraseña.
+
+1. Registro/login comprueba las credenciales y crea una sesión **HttpOnly**.
+2. El navegador solicita autorización en **`/auth/authorize`**, con `state` y PKCE.
+3. Auth redirige al portal con un código de un solo uso que vence en 60 segundos.
+4. El navegador canjea el código y su verificador en **`/auth/token`**.
+5. OAuth entrega el **access token en formato JWT**, válido por 8 horas.
+   Auth, Feeds y Agente verifican su firma, caducidad y permisos (`profile`, `feeds`, `ai`).
+
+**OAuth 2.0 gestiona la autorización; JWT es el formato del token que trabajan
+en conjunto.** No hace falta una cuenta de Google o GitHub: Auth es el servidor
+OAuth del proyecto. Los retornos permitidos están registrados explícitamente;
+no se aceptan redirecciones arbitrarias. [Flujo, rutas y prueba con Postman](docs/oauth.md).
+
 ### Base de datos
 
-Auth guarda los usuarios en **`auth.db`**. Feeds guarda fuentes, artículos y
+Auth guarda los usuarios, sesiones y códigos OAuth en **`auth.db`**. Feeds guarda fuentes, artículos y
 recortes en **`feeds.db`**. El Agente guarda las preferencias de IA en
 **`ia.json`**. Todo se prepara al arrancar.
 

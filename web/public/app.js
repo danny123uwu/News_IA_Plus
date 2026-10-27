@@ -4,11 +4,12 @@
 //  - Con "npm start" (sin Docker) la página sale por el 8090 y habla directo
 //      a los puertos 3001/3002/3003.
 const VIA_PROXY = location.port !== '8090';
-const AUTH = VIA_PROXY ? '/auth' : 'http://localhost:3001';
-const FEEDS = VIA_PROXY ? '/feeds' : 'http://localhost:3002';
-const AGENT = VIA_PROXY ? '/agente' : 'http://localhost:3003';
+const AUTH = VIA_PROXY ? '/auth' : 'http://' + location.hostname + ':3001';
+const FEEDS = VIA_PROXY ? '/feeds' : 'http://' + location.hostname + ':3002';
+const AGENT = VIA_PROXY ? '/agente' : 'http://' + location.hostname + ':3003';
 
-let token = localStorage.getItem('token') || '';
+let token = sessionStorage.getItem(PortalOAuth.TOKEN) || '';
+localStorage.removeItem('token'); // sesiones anteriores al flujo OAuth
 let yo = null;
 let fuentes = [];
 let modoRegistro = false;
@@ -476,14 +477,15 @@ function cambiarModo(reg) {
 $('formAuth').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
+    $('btnAuth').disabled = true;
     const body = { email: $('email').value, password: $('password').value };
     if (modoRegistro) body.nombre = $('nombre').value;
-    const d = await api(AUTH, modoRegistro ? '/register' : '/login', { method: 'POST', body: JSON.stringify(body) });
-    token = d.token;
-    localStorage.setItem('token', token);
-    entrar();
+    await api(AUTH, modoRegistro ? '/register' : '/login', { method: 'POST', credentials: 'include', body: JSON.stringify(body) });
+    $('authError').textContent = 'Autorizando acceso…';
+    await PortalOAuth.iniciar(AUTH);
   } catch (err) {
     $('authError').textContent = err.message;
+    $('btnAuth').disabled = false;
   }
 });
 
@@ -495,6 +497,8 @@ function salir() {
   token = '';
   yo = null;
   localStorage.removeItem('token');
+  PortalOAuth.limpiar();
+  fetch(AUTH + '/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
   mostrarLogin();
 }
 $('btnSalir').addEventListener('click', salir);
@@ -1676,12 +1680,15 @@ async function obtenerYo(intentos = 3) {
 }
 
 (async function init() {
-  if (!token) return mostrarLogin();
   try {
+    const nuevo = await PortalOAuth.completar(AUTH);
+    if (nuevo) token = nuevo;
+    if (!token) return mostrarLogin();
     const datos = await obtenerYo();
     entrar(datos);
   } catch (e) {
     toast(e.message);
     mostrarLogin();
+    $('authError').textContent = e.message;
   }
 })();

@@ -8,7 +8,7 @@
 // ============================================================================
 
 const express = require('express');
-const jwt = require('jsonwebtoken');
+const { verificarAcceso } = require('../shared/acceso');
 const { resolverSecreto, entero } = require('../shared/env');
 const {
   cabecerasSeguridad, corsPortal, crearLimitador, recortar
@@ -35,10 +35,11 @@ const SECRET = resolverSecreto();
 function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').split(' ')[1];
-    req.user = jwt.verify(token, SECRET, { algorithms: ['HS256'] });
+    req.user = verificarAcceso(token, SECRET, 'ai');
     next();
-  } catch {
-    res.status(401).json({ error: 'Token inválido o expirado' });
+  } catch (e) {
+    res.set('WWW-Authenticate', 'Bearer');
+    res.status(e.status || 401).json({ error: e.status === 403 ? e.message : 'Token inválido o expirado' });
   }
 }
 

@@ -8,7 +8,6 @@
 // ============================================================================
 
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -19,12 +18,14 @@ const {
 } = require('../shared/http');
 const { hash, check } = require('./password');
 const { normalizarEmail, nombreValido, passwordValida, tipoImagen } = require('./validacion');
+const { crearOAuth, REDIRECTS } = require('./oauth');
+const { verificarAcceso } = require('../shared/acceso');
 
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(cabecerasSeguridad);
-app.use(corsPortal());
+app.use(corsPortal({ credentials: true }));
 app.use(express.json({ limit: '8mb' }));
 
 const SECRET = resolverSecreto();
@@ -113,9 +114,9 @@ function sanearIntereses(v) {
   return [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().slice(0, 40)).filter(Boolean))].slice(0, 50);
 }
 
-function sign(u) {
-  return jwt.sign({ id: u.id, email: u.email, rol: u.rol }, SECRET, { expiresIn: '8h', algorithm: 'HS256' });
-}
+const oauth = crearOAuth({ db, secret: SECRET,
+  redirectUris: process.env.OAUTH_REDIRECT_URIS ? process.env.OAUTH_REDIRECT_URIS.split(',').map(s => s.trim()).filter(Boolean) : REDIRECTS });
+app.use(oauth.router);
 function publicUser(u) {
   return {
     id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, foto: u.foto,
@@ -132,10 +133,11 @@ function publicUser(u) {
 function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').split(' ')[1];
-    req.user = jwt.verify(token, SECRET, { algorithms: ['HS256'] });
+    req.user = verificarAcceso(token, SECRET, 'profile');
     next();
-  } catch {
-    res.status(401).json({ error: 'Token inválido o expirado' });
+  } catch (e) {
+    res.set('WWW-Authenticate', 'Bearer');
+    res.status(e.status || 401).json({ error: e.status === 403 ? e.message : 'Token inválido o expirado' });
   }
 }
 
@@ -158,7 +160,7 @@ const limiteRegistro = crearLimitador({
 
 app.get('/health', (req, res) => res.json({ ok: true, servicio: 'auth' }));
 
-app.post('/register', limiteRegistro, async (req, res) => {
+app.post('/register', oauth.origenPermitido, limiteRegistro, async (req, res) => {
   const b = req.body || {};
   const email = normalizarEmail(b.email);
   const nombre = nombreValido(b.nombre);
@@ -170,7 +172,8 @@ app.post('/register', limiteRegistro, async (req, res) => {
     const pass = await hash(String(b.password));
     const r = db.prepare('INSERT INTO users(email,nombre,pass) VALUES(?,?,?)').run(email, nombre, pass);
     const u = db.prepare('SELECT * FROM users WHERE id=?').get(r.lastInsertRowid);
-    res.json({ token: sign(u), user: publicUser(u) });
+    oauth.iniciarSesion(req, res, u);
+    res.json({ oauth: true, user: publicUser(u) });
   } catch (e) {
     if (/UNIQUE|constraint/i.test(String(e && e.message))) {
       return res.status(409).json({ error: 'Ese correo ya está registrado' });
@@ -180,7 +183,7 @@ app.post('/register', limiteRegistro, async (req, res) => {
   }
 });
 
-app.post('/login', limiteLogin, async (req, res) => {
+app.post('/login', oauth.origenPermitido, limiteLogin, async (req, res) => {
   const b = req.body || {};
   const email = recortar(b.email, 254).toLowerCase().trim();
   const pass = String(b.password == null ? '' : b.password);
@@ -189,7 +192,8 @@ app.post('/login', limiteLogin, async (req, res) => {
   if (!u || !(await check(pass, u.pass))) {
     return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
   }
-  res.json({ token: sign(u), user: publicUser(u) });
+  oauth.iniciarSesion(req, res, u);
+  res.json({ oauth: true, user: publicUser(u) });
 });
 
 app.get('/me', auth, (req, res) => {

@@ -9,7 +9,8 @@ independiente. Comparten lenguaje y utilidades, pero se comunican por HTTP y
 pueden iniciarse como procesos separados o contenedores separados. Compartir
 imagen Docker no significa compartir proceso. Nginx no implementa negocio.
 
-- **Auth:** Express + SQLite + scrypt + JWT. El JWT se firma HS256 y expira en 8 horas.
+- **Auth:** Express + SQLite + scrypt + OAuth 2.0 (`@node-oauth/oauth2-server`).
+  Authorization Code con PKCE S256 emite un access token JWT HS256 de 8 horas.
 - **Feeds:** Express + SQLite + rss-parser. Administra sus datos; no consulta auth.db.
 - **Agente:** Express, clientes fetch y configuración JSON por usuario. No abre feeds.db.
 - **Web:** Express estático y JavaScript del navegador. No accede a archivos de base.
@@ -17,8 +18,10 @@ imagen Docker no significa compartir proceso. Nginx no implementa negocio.
 
 ## Flujo de extremo a extremo
 
-1. Navegador solicita registro/login a Auth y obtiene JWT y perfil público.
-2. Navegador presenta ese JWT a Feeds y Agente. Los servicios validan firma y caducidad.
+1. Registro/login crea una sesión HttpOnly; el navegador completa `/authorize`
+   → redirección con código → `/token` con PKCE y comprobación de `state`.
+2. OAuth entrega el access token JWT. Los servicios validan firma, caducidad,
+   emisor, destinatario y los permisos del recurso solicitado.
 3. Usuario añade URL de portal; Feeds detecta RSS/Atom o feed WordPress cuando existe.
 4. Feeds descarga con controles de URL, tamaño y tiempo; convierte y guarda noticias.
 5. Clasifica primero por reglas; encola refinamiento por IA y traducción.
@@ -58,7 +61,7 @@ Si el proceso reinicia, se pierde la cola en memoria.
 SQLite facilita una entrega reproducible sin servidor de base externo, con WAL
 e índices. No se demuestra alta disponibilidad ni escalado horizontal. JWT
 compartido simplifica autenticación entre servicios, pero requiere proteger el
-secreto y no ofrece revocación de sesiones. La IA tiene respaldo por reglas en
+secreto; cerrar la sesión OAuth no revoca inmediatamente un JWT ya emitido. La IA tiene respaldo por reglas en
 clasificación/resumen, no garantiza veracidad ni una latencia fija.
 
 Las mejoras de seguridad observadas son prácticas técnicas, no una certificación

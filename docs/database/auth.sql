@@ -21,3 +21,22 @@ CREATE TABLE IF NOT EXISTS users (
   tema_colores TEXT DEFAULT '{}',
   color_texto_hex TEXT DEFAULT ''
 );
+
+-- Estado del servidor OAuth 2.0 (services/auth/oauth.js).
+CREATE TABLE IF NOT EXISTS oauth_sessions (
+  session_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_id TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  code_challenge_method TEXT NOT NULL DEFAULT 'S256' CHECK(code_challenge_method='S256'),
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_sessions_expiry ON oauth_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_expiry ON oauth_codes(expires_at);

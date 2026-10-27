@@ -52,8 +52,10 @@ obligaciones inventadas del curso. La calificación corresponde al docente.
 
 ## Límites que deben explicarse en la defensa
 
-1. **JWT no es OAuth 2.0.** No hay flujo authorize/token, refresh tokens ni revocación
-   al cerrar sesión: salir elimina el token del navegador, no invalida su firma.
+1. **OAuth 2.0 + JWT.** Auth implementa Authorization Code con PKCE S256 mediante
+   `@node-oauth/oauth2-server`. El token solo se emite tras `/authorize` y
+   `/token`. No se emiten refresh tokens; salir cierra la sesión OAuth y borra
+   el token del navegador, sin revocar de inmediato los JWT ya emitidos.
 2. **Integridad referencial parcial.** No hay FK físicas entre tablas de Feeds;
    los recortes conservan instantáneas y pueden quedar con `article_id` huérfano.
 3. **API externa no equivale a cuenta validada.** No hay claves reales en esta
@@ -71,7 +73,7 @@ obligaciones inventadas del curso. La calificación corresponde al docente.
    El filtro de tiempo limita visualización, no el almacenamiento.
 9. **Nativo pensado para localhost.** Usa URLs locales fijas para APIs; requiere
    adaptación para operar remotamente y no lee `.env` con `npm start` a secas.
-10. **Seguridad no completa.** HTTP sin TLS por defecto, token en localStorage y
+10. **Seguridad no completa.** HTTP sin TLS por defecto, token en sessionStorage y
     clave externa en JSON privado sin cifrado de aplicación. Los permisos 600
     no protegen contra un proceso comprometido con acceso al mismo usuario.
 

@@ -97,6 +97,7 @@ services:
     environment:
       - "JWT_SECRET=${JWT_SECRET:?Falta JWT_SECRET en .env (generá uno con: openssl rand -hex 32)}"
       - TRUST_PROXY=1
+      - OAUTH_REDIRECT_URIS=${OAUTH_REDIRECT_URIS:-http://localhost/,http://127.0.0.1/,http://localhost:8090/,http://127.0.0.1:8090/,http://localhost:8080/,http://127.0.0.1:8080/}
     volumes:
       - ./data:/app/data
     expose: ["3001"]

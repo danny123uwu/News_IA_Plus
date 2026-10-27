@@ -16,6 +16,7 @@ y explicación está en [el informe](../entrega-final.md#recorrido-visual-ordena
 | 19 | Ventana de ancho reducido |
 | 20–21 | Pregunta contextual real y digest |
 | 22–23 | Tema claro y diagnóstico del Agente |
+| 24 | Perfil con sesión obtenida por OAuth 2.0 + PKCE |
 
 `manifest.json` describe las capturas y sus hashes. Los archivos `.txt` guardan
 resultados de pruebas y diagnóstico sin secretos. No se incluye ninguna base

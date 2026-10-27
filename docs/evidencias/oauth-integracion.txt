@@ -1,0 +1,16 @@
+Integración REAL de los cuatro procesos Node con datos sintéticos aislados.
+OK arranque nativo del servicio :3001
+OK arranque nativo del servicio :3002
+OK arranque nativo del servicio :3003
+OK arranque nativo del servicio :8090
+OK registro con scrypt y sesión HttpOnly, SIN token directo
+OK contraseña incorrecta rechazada
+OK login real y CORS con credenciales
+OK redirección OAuth real y canje PKCE por access_token JWT
+OK access_token aceptado por :3001/me
+OK access_token aceptado por :3002/feed
+OK access_token aceptado por :3003/spanish
+OK Feeds y Agente rechazan un token sin sus scopes (403)
+OK petición anónima rechazada (401)
+OK cierre de la sesión de autorización
+Sin claves, cookies ni tokens publicados.

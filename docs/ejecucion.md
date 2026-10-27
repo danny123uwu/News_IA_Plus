@@ -7,6 +7,9 @@ Para el uso habitual basta con el menú **`./portal.sh` en Linux** o
 
 Prepará `.env` desde `.env.example` con un `JWT_SECRET` aleatorio propio.
 No lo publiques ni reemplaces un `.env` existente al actualizar.
+`OAUTH_REDIRECT_URIS` es opcional: si no se define, se admiten las raíces de
+`localhost` y `127.0.0.1` en los puertos 80, 8080 y 8090. Para otro dominio,
+registrar allí la URL exacta de retorno. Fuera de localhost debe ser HTTPS.
 
 ```bash
 docker compose -f docker-compose.yml build web

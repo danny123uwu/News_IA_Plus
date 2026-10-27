@@ -66,7 +66,8 @@ El usuario conserva control sobre sus fuentes y sobre el motor de IA.
 
 ![Arquitectura real del despliegue](diagramas/arquitectura.png){width=95%}
 
-**Auth (:3001):** registro/login, hash scrypt y JWT HS256 de 8 horas; perfil,
+**Auth (:3001):** registro/login y OAuth 2.0 Authorization Code con PKCE S256,
+mediante `@node-oauth/oauth2-server`; emite access tokens JWT de 8 horas. Perfil,
 foto, idioma e intereses. Persiste en `auth.db`.
 
 **Feeds (:3002):** administra fuentes, importa RSS y artículos, genera el feed,
@@ -92,16 +93,17 @@ comunican directamente dentro de Docker, sin volver a pasar por el proxy.
 
 ![Tablas reales y relaciones lógicas](diagramas/modelo-relacional.png){width=95%}
 
-- `auth.db`: tabla `users` (identidad, hash, perfil y preferencias).
+- `auth.db`: `users` (identidad, hash, perfil), `oauth_sessions` y `oauth_codes` (autorización OAuth).
 - `feeds.db`: `sources` (fuentes), `articles` (noticias y estados), `clips` (recortes).
 - `ia.json`: preferencias de IA por usuario; no es una tabla SQL.
 - `uploads/`: archivos de fotos; la tabla guarda el nombre, no el binario.
 
-Las cuatro tablas tienen clave primaria entera autoincremental. Hay unicidad
-de `users.email` y del par `articles(source_id,link)`.
+Las cuatro tablas de negocio tienen clave primaria entera autoincremental;
+las dos tablas OAuth tienen hashes de texto como clave. Hay unicidad de
+`users.email` y del par `articles(source_id,link)`.
 
-**Importante:** los IDs que relacionan tablas son referencias lógicas. No hay
-FK físicas declaradas en Feeds ni claves foráneas entre los archivos SQLite.
+Las relaciones de Feeds son lógicas; no hay FK entre los archivos SQLite.
+Dentro de Auth, sesiones y códigos OAuth sí tienen FK hacia `users`.
 La aplicación realiza controles de propiedad mediante JWT y consultas. Al
 eliminar una fuente se borran sus artículos, pero los recortes conservan una
 instantánea y pueden mantener una referencia huérfana al artículo.
@@ -174,7 +176,7 @@ Ollama del host; el lanzador de modo host sí requiere un Ollama externo accesib
 
 ## Resultados obtenidos
 
-- **47 pruebas automatizadas aprobadas**, sin fallos.
+- **64 pruebas automatizadas aprobadas**, sin fallos.
 - Prueba RSS real: Laboratorio Linux, The Verge, Xataka, Google Blog y Ars Technica correctos; también XML roto y sitio sin feed.
 - Arranque nativo en copia aislada: cuatro healthchecks, registro, login, perfil, feed vacío y respaldo por reglas correctos.
 - SQL de documentación: estructura e índices coinciden con las tablas reales, sin exportar datos.
@@ -188,7 +190,7 @@ validado de extremo a extremo en este equipo. Véase `docs/verificacion.md`.
 
 ## Protección de los datos
 
-Scrypt con sal, validación JWT, sentencias parametrizadas, filtros por
+OAuth 2.0 con PKCE, scrypt con sal, validación JWT y scopes, sentencias parametrizadas, filtros por
 propietario, validación de imágenes, límites de peticiones y controles SSRF
 para RSS. Los archivos privados se excluyen de Git.
 
@@ -229,13 +231,17 @@ El informe y las capturas no realizan por sí solos el envío en el aula virtual
 # Recorrido visual ordenado
 
 Capturas reales de Firefox sobre la aplicación local el 26 de octubre de 2026.
-Cuenta visible: **Demo Proyecto Final**, creada para estas evidencias. No se
-muestran contraseñas, tokens, claves ni el perfil personal del autor. Al
-terminar se pausaron sus fuentes para evitar importaciones de fondo adicionales.
+Cuenta visible: **Demo Proyecto Final**, creada para estas evidencias. El
+recorrido de lectura (03–23) utiliza la cuenta demo con las fuentes importadas.
+La captura 24 se tomó al comprobar el acceso OAuth con una cuenta demo nueva,
+por eso su feed aparece sin noticias. No se muestran contraseñas, tokens,
+claves ni el perfil personal del autor. Al terminar se pausaron las fuentes
+de la cuenta de lectura para evitar importaciones de fondo adicionales.
 
 ## 01. Inicio de sesión
 
-Punto de entrada. Auth valida credenciales y entrega un JWT para las operaciones protegidas.
+Punto de entrada. Auth valida las credenciales y el navegador completa OAuth
+2.0 con PKCE: autorización, código de un solo uso y canje por un access token JWT.
 
 ![01 - Inicio de sesión](evidencias/01-inicio-sesion.png){width=95%}
 
@@ -420,6 +426,18 @@ La misma aplicación con una apariencia alternativa, elegida desde su selector r
 Respuesta real del endpoint público de diagnóstico. La disponibilidad local no acredita que una clave de API externa sea válida.
 
 ![23 - Health del agente](evidencias/23-health-agente.png){width=95%}
+
+---
+
+## 24. Sesión autenticada mediante OAuth 2.0
+
+Perfil de la cuenta demo creada durante la comprobación del flujo completo en
+Firefox: registro, redirección a `/authorize`, canje del código con PKCE y
+access token en la pestaña. La cookie de autorización es HttpOnly, de modo que
+JavaScript no puede leerla. Esta sesión es independiente de la cuenta de
+lectura usada en las capturas 03–23; por eso el feed no muestra noticias.
+
+![24 - Sesión OAuth activa](evidencias/24-sesion-oauth-activa.png){width=95%}
 
 # Referencias de la entrega
 

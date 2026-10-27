@@ -5,7 +5,7 @@ equipo local del autor; no son una prueba de carga ni de disponibilidad futura.
 
 | Verificación | Resultado | Evidencia |
 |---|---|---|
-| Suite automatizada | 47 pruebas, 47 aprobadas, 0 fallos | [Salida completa](evidencias/pruebas-automatizadas.txt) |
+| Suite automatizada | 64 pruebas, 64 aprobadas, 0 fallos | [Salida completa](evidencias/pruebas-automatizadas.txt) |
 | RSS real | Cinco sitios respondieron con feed y noticias | [Salida de integración](evidencias/pruebas-rss-red.txt) |
 | XML roto / sitio sin feed | Rescate y error comprensible, ambos correctos | Mismo archivo de integración RSS |
 | SQL de documentación | Columnas, tipos, defaults e índices coinciden con las bases reales | [Comparación](evidencias/verificacion-esquema.txt) |
@@ -17,6 +17,9 @@ equipo local del autor; no son una prueba de carga ni de disponibilidad futura.
 | Panel sin desplazar artículo | Mismo rectángulo y scroll antes/después de abrir panel | [Manifiesto](evidencias/manifest.json) |
 | APIs externas | Siete protocolos/opciones probados con fetch simulado | `tests/providers.test.js` y suite |
 | API sin clave en portal real | Rechazo y mensajes, sin modificar configuración original | Prueba HTTP de las rutas de configuración durante la revisión |
+| OAuth HTTP real | Registro/login y canje PKCE; token aceptado por los tres servicios; permisos insuficientes 403 | [Integración](evidencias/oauth-integracion.txt) |
+| OAuth desde Firefox con Docker | Registro, redirección, canje, perfil, logout y nuevo login reales | [Navegador Docker](evidencias/oauth-navegador-docker.txt) |
+| OAuth desde Firefox sin Docker | Mismo flujo real entre los puertos 8090 y 3001, con cookies/CORS | [Navegador nativo](evidencias/oauth-navegador-nativo.txt) |
 
 ## Alcance y límites de los resultados
 

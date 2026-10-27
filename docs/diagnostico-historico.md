@@ -434,7 +434,8 @@ curl -s -X POST localhost/feeds/feeds/test -H "Authorization: Bearer $TOKEN" \
 - **Arquitectura modular**: `services/shared/` (seguridad y utilidades) y `services/agent/ai/` (IA separada de las rutas y del negocio)
 
 ### Pendiente (FALTA)
-- [ ] **OAuth 2.0 real** (`/authorize` con redirect y `/token`) — hoy es login directo con JWT
+- [x] **OAuth 2.0 real** (`/authorize` con redirect y `/token`) — implementado
+  después de este diagnóstico; ver [OAuth 2.0](oauth.md)
 - [ ] **Verificación de veracidad** (comparar con otras fuentes)
 - [ ] **Alertas por palabra clave**
 - [ ] **Filtro por formato** (artículo/video/podcast) **y rango de edad**

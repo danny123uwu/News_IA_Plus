@@ -18,6 +18,7 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const { abrirFeed, normalizarUrl } = require('./rss');
 const { resolverSecreto, entero } = require('../shared/env');
+const { verificarAcceso } = require('../shared/acceso');
 const {
   cabecerasSeguridad, corsPortal, crearLimitador, recortar, numero, jsonSeguro, listaSegura
 } = require('../shared/http');
@@ -159,10 +160,11 @@ function fechaISO(valor) {
 function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').split(' ')[1];
-    req.user = jwt.verify(token, SECRET, { algorithms: ['HS256'] });
+    req.user = verificarAcceso(token, SECRET, 'feeds');
     next();
-  } catch {
-    res.status(401).json({ error: 'Token inválido o expirado' });
+  } catch (e) {
+    res.set('WWW-Authenticate', 'Bearer');
+    res.status(e.status || 401).json({ error: e.status === 403 ? e.message : 'Token inválido o expirado' });
   }
 }
 

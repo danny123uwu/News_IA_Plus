@@ -10,6 +10,8 @@ erDiagram
     USERS ||..o{ SOURCES : "posee (logica entre bases)"
     USERS ||..o{ ARTICLES : "propietario (logica)"
     USERS ||..o{ CLIPS : "guarda (logica)"
+    USERS ||--o{ OAUTH_SESSIONS : "sesion (FK)"
+    USERS ||--o{ OAUTH_CODES : "autoriza (FK)"
     SOURCES ||..o{ ARTICLES : "origina (logica)"
     ARTICLES o|..o{ CLIPS : "referencia opcional (logica)"
     USERS {
@@ -46,6 +48,21 @@ erDiagram
       TEXT nota
       TEXT fecha
     }
+    OAUTH_SESSIONS {
+      TEXT session_hash PK
+      INTEGER user_id FK
+      INTEGER expires_at
+    }
+    OAUTH_CODES {
+      TEXT code_hash PK
+      INTEGER user_id FK
+      TEXT client_id
+      TEXT redirect_uri
+      TEXT scope
+      TEXT code_challenge
+      TEXT code_challenge_method
+      INTEGER expires_at
+    }
 ```
 
 El Mermaid anterior es un resumen conceptual; `preferencias` y `estados` agrupan
@@ -56,16 +73,41 @@ y los archivos SQL siguientes son la descripción física completa.
 
 | Archivo privado | Dueño | Contenido |
 |---|---|---|
-| `data/auth.db` | Auth | Tabla `users` y restricción única de correo |
+| `data/auth.db` | Auth | `users`, `oauth_sessions`, `oauth_codes` |
 | `data/feeds.db` | Feeds | Tablas `sources`, `articles`, `clips` e índices |
 | `data/ia.json` | Agente | Configuración por clave `u<ID>`, no es una tabla SQL |
 | `data/uploads/` | Auth | Imágenes de perfil, la tabla guarda solo su nombre |
 
-Las claves primarias son enteros autoincrementales. Las relaciones marcadas
+Las tablas de negocio usan claves enteras autoincrementales; las dos tablas
+OAuth usan un hash de texto como clave primaria. Las relaciones marcadas
 como lógicas **no tienen restricciones `FOREIGN KEY` declaradas** en el código.
 `user_id` referencia conceptualmente a `users.id`, pero las bases son diferentes.
 Feeds usa el JWT y filtros `user_id` para aislar datos. No hay JOIN SQL entre
 Auth y Feeds. Los JOIN de `articles.source_id = sources.id` ocurren dentro de Feeds.
+
+Las tablas OAuth sí declaran `user_id REFERENCES users(id) ON DELETE CASCADE`
+porque están dentro de la misma base Auth. No se crean relaciones SQL entre servicios.
+
+## Estado OAuth 2.0 — auth.db
+
+| Tabla / campo | Tipo / restricción | Función |
+|---|---|---|
+| oauth_sessions.session_hash | TEXT PK | SHA-256 de la cookie de sesión; no se guarda la cookie original |
+| oauth_sessions.user_id | INTEGER NOT NULL, FK a users | Usuario que inició sesión |
+| oauth_sessions.expires_at | INTEGER NOT NULL | Caducidad en milisegundos Unix (10 minutos) |
+| oauth_codes.code_hash | TEXT PK | SHA-256 del código de autorización de un solo uso |
+| oauth_codes.user_id | INTEGER NOT NULL, FK a users | Usuario que autorizó el acceso |
+| oauth_codes.client_id | TEXT NOT NULL | Cliente público registrado, portal-web |
+| oauth_codes.redirect_uri | TEXT NOT NULL | URL exacta de retorno autorizada |
+| oauth_codes.scope | TEXT NOT NULL | Permisos separados por espacios |
+| oauth_codes.code_challenge | TEXT NOT NULL | Challenge PKCE, no el verificador secreto |
+| oauth_codes.code_challenge_method | TEXT NOT NULL, CHECK S256 | Método PKCE obligatorio |
+| oauth_codes.expires_at | INTEGER NOT NULL | Caducidad del código (60 segundos) |
+
+Los access tokens JWT son autocontenidos, no se guardan como una tabla de tokens.
+Índices `idx_oauth_sessions_expiry` e `idx_oauth_codes_expiry` por caducidad.
+Las filas caducadas se limpian al crear sesiones/códigos; el canje también
+comprueba la caducidad y elimina el código para impedir su reutilización.
 
 ## `users` — auth.db
 

@@ -10,8 +10,11 @@ sin prefijo. Salvo health, registro, login y estáticos públicos, se requiere
 | Método | Ruta del servicio | Función |
 |---|---|---|
 | GET | /health | Estado de proceso |
-| POST | /register | Crear cuenta: email, password y nombre |
-| POST | /login | Obtener token: email y password |
+| POST | /register | Crear cuenta y sesión HttpOnly: email, password y nombre |
+| POST | /login | Crear sesión de autorización: email y password |
+| GET | /authorize | OAuth 2.0 Authorization Code con PKCE S256 |
+| POST | /token | Canjear código/verificador por access_token JWT |
+| POST | /logout | Cerrar sesión de autorización |
 | GET | /me | Perfil público del usuario autenticado |
 | PUT | /me | Actualizar nombre, intereses, idioma y preferencias visuales |
 | POST | /me/foto | Subir imagen base64 validada |
@@ -67,9 +70,9 @@ Web :8090 expone `/health` y los archivos de `web/public/`. Nginx :80 expone
 
 ## Ejemplo de demostración sin secretos publicados
 
-En Postman, crear `baseUrl=http://localhost`; registrar un usuario de prueba con
-`POST {{baseUrl}}/auth/register`. Copiar el token únicamente a una variable
-privada de Postman y configurar Bearer Token. Luego:
+En Postman, crear `baseUrl=http://localhost`; completar [el flujo OAuth](oauth.md#probar-con-postman)
+y guardar `access_token` únicamente en una variable privada de Postman.
+Configurar Bearer Token. Luego:
 
 ```text
 GET  {{baseUrl}}/auth/me

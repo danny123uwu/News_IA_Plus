@@ -34,9 +34,9 @@
 <text x="668" y="290" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">Nginx :80 (puerta de entrada)</text>
 <text x="668" y="325" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">Enruta /, /auth/, /feeds/, /agente/</text>
 <rect x="50" y="455" width="350" height="120" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
-<text x="68" y="495" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">Auth :3001</text>
+<text x="68" y="495" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">Auth / OAuth 2.0 :3001</text>
 <text x="68" y="530" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">Registro, login, perfil</text>
-<text x="68" y="560" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">Contraseñas scrypt + JWT</text>
+<text x="68" y="560" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">PKCE S256 + JWT</text>
 <rect x="500" y="455" width="350" height="120" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
 <text x="518" y="495" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">Web :8090</text>
 <text x="518" y="530" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">HTML / CSS / JavaScript</text>
@@ -52,7 +52,7 @@
 <text x="1305" y="494" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#0369a1">HTTP</text>
 <rect x="50" y="695" width="350" height="100" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
 <text x="68" y="735" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">auth.db (SQLite)</text>
-<text x="68" y="770" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">users / perfil y preferencias</text>
+<text x="68" y="770" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">users / sesiones / códigos</text>
 <rect x="950" y="695" width="350" height="100" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
 <text x="968" y="735" font-family="DejaVu Sans, sans-serif" font-size="26" fill="#0369a1">feeds.db (SQLite)</text>
 <text x="968" y="770" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#0f172a">sources / articles / clips</text>
