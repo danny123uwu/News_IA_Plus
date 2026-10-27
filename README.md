@@ -1,7 +1,10 @@
 # 📰 Portal IA News
 
-Tu portal de noticias con inteligencia artificial: elegí tus fuentes, organizá
-tu lectura y pedí resúmenes o preguntale a la IA sobre una noticia.
+Portal de noticias centralizado con inteligencia artificial que permite acceder
+a distintos medios desde un solo lugar, organizar la información según tus
+intereses y facilitar su comprensión mediante resúmenes, traducciones y
+preguntas sobre las noticias. Así podés consultar tus fuentes favoritas y
+mantenerte informado sin tener que visitar cada sitio por separado.
 
 **3 microservicios · JWT · RSS · Docker + Nginx · IA local o API externa**
 
