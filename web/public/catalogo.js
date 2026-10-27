@@ -59,7 +59,7 @@ window.CATALOGO = [
   { n: 'Linux Handbook', u: 'https://linuxhandbook.com/feed/' },
   { n: 'Tecmint', u: 'https://www.tecmint.com/feed/' },
   { n: 'Red Hat Blog', u: 'https://www.redhat.com/en/blog/feed' },
-  { n: 'Laboratorio Linux', u: 'https://laboratoriolinux.es/feed/' }
+  { n: 'Laboratorio Linux', u: 'https://laboratoriolinux.es/index.php?format=feed&type=rss' }
 ]},
 { cat: 'Tecnología general (español)', items: [
   { n: 'Xataka', u: 'https://www.xataka.com/rss' },
